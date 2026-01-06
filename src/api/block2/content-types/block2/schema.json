@@ -1,0 +1,50 @@
+{
+  "kind": "collectionType",
+  "collectionName": "block2s",
+  "info": {
+    "singularName": "block2",
+    "pluralName": "block2s",
+    "displayName": "Block2"
+  },
+  "options": {
+    "draftAndPublish": true
+  },
+  "pluginOptions": {},
+  "attributes": {
+    "tituloBlock2": {
+      "type": "string"
+    },
+    "description": {
+      "type": "text"
+    },
+    "imageBlock2": {
+      "type": "media",
+      "multiple": true,
+      "allowedTypes": [
+        "images",
+        "files",
+        "videos",
+        "audios"
+      ]
+    },
+    "slug": {
+      "type": "uid",
+      "targetField": "tituloBlock2"
+    },
+    "isFeatured": {
+      "type": "boolean"
+    },
+    "category": {
+      "type": "relation",
+      "relation": "oneToOne",
+      "target": "api::category.category",
+      "mappedBy": "block_2"
+    },
+    "product": {
+      "type": "relation",
+      "relation": "oneToOne",
+      "target": "api::product.product",
+      "inversedBy": "block_2"
+    }
+  }
+}

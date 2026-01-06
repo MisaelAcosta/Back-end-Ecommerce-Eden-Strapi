@@ -1,0 +1,105 @@
+{
+  "kind": "collectionType",
+  "collectionName": "orders",
+  "info": {
+    "singularName": "order",
+    "pluralName": "orders",
+    "displayName": "Order"
+  },
+  "options": {
+    "draftAndPublish": true
+  },
+  "pluginOptions": {},
+  "attributes": {
+    "orderName": {
+      "type": "string"
+    },
+    "slug": {
+      "type": "uid",
+      "targetField": "orderName"
+    },
+    "orderNumber": {
+      "type": "uid"
+    },
+    "commerceOrder": {
+      "type": "string"
+    },
+    "customer": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "plugin::users-permissions.user",
+      "inversedBy": "orders"
+    },
+    "statusOrder": {
+      "type": "enumeration",
+      "default": "PENDING_PAYMENT",
+      "enum": [
+        "PENDING_PAYMENT",
+        "PAID",
+        "REJECTED",
+        "CANCELED"
+      ]
+    },
+    "subtotal": {
+      "type": "integer"
+    },
+    "shippingCost": {
+      "type": "integer"
+    },
+    "total": {
+      "type": "integer"
+    },
+    "customerName": {
+      "type": "string"
+    },
+    "rutBody": {
+      "type": "string"
+    },
+    "rutDv": {
+      "type": "string"
+    },
+    "phone": {
+      "type": "string"
+    },
+    "region": {
+      "type": "string"
+    },
+    "comuna": {
+      "type": "string"
+    },
+    "calle": {
+      "type": "string"
+    },
+    "numero": {
+      "type": "string"
+    },
+    "depto": {
+      "type": "string"
+    },
+    "nota": {
+      "type": "text"
+    },
+    "paymentProvider": {
+      "type": "enumeration",
+      "default": "Default: FLOW",
+      "enum": [
+        "Default: FLOW"
+      ]
+    },
+    "flowToken": {
+      "type": "string"
+    },
+    "paymentUrl": {
+      "type": "string"
+    },
+    "paidAt": {
+      "type": "date"
+    },
+    "order_items": {
+      "type": "relation",
+      "relation": "oneToMany",
+      "target": "api::order-item.order-item",
+      "mappedBy": "order"
+    }
+  }
+}

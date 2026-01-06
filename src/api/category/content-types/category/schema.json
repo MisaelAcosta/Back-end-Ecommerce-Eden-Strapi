@@ -1,0 +1,73 @@
+{
+  "kind": "collectionType",
+  "collectionName": "categories",
+  "info": {
+    "singularName": "category",
+    "pluralName": "categories",
+    "displayName": "Category",
+    "description": "Organize your content into categories"
+  },
+  "options": {
+    "draftAndPublish": false
+  },
+  "pluginOptions": {},
+  "attributes": {
+    "categoryName": {
+      "type": "string"
+    },
+    "slug": {
+      "type": "uid",
+      "targetField": "categoryName"
+    },
+    "mainImage": {
+      "type": "media",
+      "multiple": false,
+      "allowedTypes": [
+        "images",
+        "files",
+        "videos",
+        "audios"
+      ]
+    },
+    "description": {
+      "type": "text"
+    },
+    "isFeatured": {
+      "type": "boolean"
+    },
+    "sub_categories": {
+      "type": "relation",
+      "relation": "oneToMany",
+      "target": "api::sub-category.sub-category",
+      "mappedBy": "category"
+    },
+    "promotions": {
+      "type": "relation",
+      "relation": "manyToMany",
+      "target": "api::promotion.promotion",
+      "inversedBy": "categories"
+    },
+    "block_2": {
+      "type": "relation",
+      "relation": "oneToOne",
+      "target": "api::block2.block2",
+      "inversedBy": "category"
+    },
+    "block_1": {
+      "type": "relation",
+      "relation": "oneToOne",
+      "target": "api::block1.block1",
+      "inversedBy": "category"
+    },
+    "secondImage": {
+      "type": "media",
+      "multiple": true,
+      "allowedTypes": [
+        "images",
+        "files",
+        "videos",
+        "audios"
+      ]
+    }
+  }
+}

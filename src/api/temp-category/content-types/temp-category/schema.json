@@ -1,0 +1,44 @@
+{
+  "kind": "collectionType",
+  "collectionName": "temp_categories",
+  "info": {
+    "singularName": "temp-category",
+    "pluralName": "temp-categories",
+    "displayName": "TempCategory"
+  },
+  "options": {
+    "draftAndPublish": true
+  },
+  "pluginOptions": {},
+  "attributes": {
+    "tempCategoryName": {
+      "type": "string"
+    },
+    "slug": {
+      "type": "uid",
+      "targetField": "tempCategoryName"
+    },
+    "mainImage": {
+      "type": "media",
+      "multiple": true,
+      "allowedTypes": [
+        "images",
+        "files",
+        "videos",
+        "audios"
+      ]
+    },
+    "description": {
+      "type": "text"
+    },
+    "isFeatured": {
+      "type": "boolean"
+    },
+    "promotions": {
+      "type": "relation",
+      "relation": "manyToMany",
+      "target": "api::promotion.promotion",
+      "mappedBy": "temp_categories"
+    }
+  }
+}

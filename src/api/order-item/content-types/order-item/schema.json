@@ -1,0 +1,52 @@
+{
+  "kind": "collectionType",
+  "collectionName": "order_items",
+  "info": {
+    "singularName": "order-item",
+    "pluralName": "order-items",
+    "displayName": "OrderItem"
+  },
+  "options": {
+    "draftAndPublish": true
+  },
+  "pluginOptions": {},
+  "attributes": {
+    "orderItemName": {
+      "type": "string"
+    },
+    "slug": {
+      "type": "uid",
+      "targetField": "orderItemName"
+    },
+    "order": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "api::order.order",
+      "inversedBy": "order_items"
+    },
+    "variant": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "api::variant.variant",
+      "inversedBy": "order_items"
+    },
+    "qty": {
+      "type": "integer"
+    },
+    "unitPrice": {
+      "type": "integer"
+    },
+    "lineTotal": {
+      "type": "integer"
+    },
+    "skuSnapshot": {
+      "type": "string"
+    },
+    "variantNameSnapshot": {
+      "type": "string"
+    },
+    "productNameSnapshot": {
+      "type": "string"
+    }
+  }
+}
