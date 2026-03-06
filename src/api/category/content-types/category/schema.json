@@ -58,16 +58,6 @@
       "relation": "oneToOne",
       "target": "api::block1.block1",
       "inversedBy": "category"
-    },
-    "secondImage": {
-      "type": "media",
-      "multiple": true,
-      "allowedTypes": [
-        "images",
-        "files",
-        "videos",
-        "audios"
-      ]
     }
   }
 }

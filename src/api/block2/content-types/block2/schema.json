@@ -45,6 +45,16 @@
       "relation": "oneToOne",
       "target": "api::product.product",
       "inversedBy": "block_2"
+    },
+    "imageMobile": {
+      "type": "media",
+      "multiple": true,
+      "allowedTypes": [
+        "images",
+        "files",
+        "videos",
+        "audios"
+      ]
     }
   }
 }

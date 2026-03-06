@@ -490,6 +490,10 @@ export interface ApiBlock2Block2 extends Struct.CollectionTypeSchema {
       'images' | 'files' | 'videos' | 'audios',
       true
     >;
+    imageMobile: Schema.Attribute.Media<
+      'images' | 'files' | 'videos' | 'audios',
+      true
+    >;
     isFeatured: Schema.Attribute.Boolean;
     locale: Schema.Attribute.String & Schema.Attribute.Private;
     localizations: Schema.Attribute.Relation<
@@ -539,10 +543,6 @@ export interface ApiCategoryCategory extends Struct.CollectionTypeSchema {
       'api::promotion.promotion'
     >;
     publishedAt: Schema.Attribute.DateTime;
-    secondImage: Schema.Attribute.Media<
-      'images' | 'files' | 'videos' | 'audios',
-      true
-    >;
     slug: Schema.Attribute.UID<'categoryName'>;
     sub_categories: Schema.Attribute.Relation<
       'oneToMany',

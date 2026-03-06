@@ -132,7 +132,7 @@ build
 
 # dependencias
 node_modules
-.cache
+.cach
 .build
 
 # entorno
