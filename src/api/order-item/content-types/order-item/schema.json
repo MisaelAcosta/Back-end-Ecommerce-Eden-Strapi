@@ -47,6 +47,9 @@
     },
     "productNameSnapshot": {
       "type": "string"
+    },
+    "imageUrlSnapshot": {
+      "type": "text"
     }
   }
 }
