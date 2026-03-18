@@ -81,9 +81,9 @@
     },
     "paymentProvider": {
       "type": "enumeration",
-      "default": "Default: FLOW",
+      "default": "FLOW",
       "enum": [
-        "Default: FLOW"
+        "FLOW"
       ]
     },
     "flowToken": {

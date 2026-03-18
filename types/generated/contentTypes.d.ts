@@ -663,8 +663,8 @@ export interface ApiOrderOrder extends Struct.CollectionTypeSchema {
     orderName: Schema.Attribute.String;
     orderNumber: Schema.Attribute.UID;
     paidAt: Schema.Attribute.Date;
-    paymentProvider: Schema.Attribute.Enumeration<['Default: FLOW']> &
-      Schema.Attribute.DefaultTo<'Default: FLOW'>;
+    paymentProvider: Schema.Attribute.Enumeration<['FLOW']> &
+      Schema.Attribute.DefaultTo<'FLOW'>;
     paymentUrl: Schema.Attribute.String;
     phone: Schema.Attribute.String;
     publishedAt: Schema.Attribute.DateTime;
