@@ -20,7 +20,7 @@ export default ({ env }) => {
       },
       pool: {
         min: env.int('DATABASE_POOL_MIN', 0),
-        max: env.int('DATABASE_POOL_MAX', 3),
+        max: env.int('DATABASE_POOL_MAX', 1),
       },
     },
 
@@ -28,9 +28,9 @@ export default ({ env }) => {
       connection: {
         host: env('DATABASE_HOST', 'localhost'),
         port: env.int('DATABASE_PORT', 5432),
-        database: env('DATABASE_NAME', 'eden-web'),
-        user: env('DATABASE_USERNAME', ''),
-        password: env('DATABASE_PASSWORD', ''),
+        database: env('DATABASE_NAME'),
+        user: env('DATABASE_USERNAME'),
+        password: env('DATABASE_PASSWORD'),
         ssl: env.bool('DATABASE_SSL', true)
           ? {
               rejectUnauthorized: env.bool(
@@ -43,7 +43,7 @@ export default ({ env }) => {
       },
       pool: {
         min: env.int('DATABASE_POOL_MIN', 0),
-        max: env.int('DATABASE_POOL_MAX', 3),
+        max: env.int('DATABASE_POOL_MAX', 1),
       },
     },
 
