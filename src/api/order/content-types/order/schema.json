@@ -100,6 +100,12 @@
       "relation": "oneToMany",
       "target": "api::order-item.order-item",
       "mappedBy": "order"
+    },
+    "order_imprimes": {
+      "type": "relation",
+      "relation": "oneToMany",
+      "target": "api::order-imprime.order-imprime",
+      "mappedBy": "order"
     }
   }
 }

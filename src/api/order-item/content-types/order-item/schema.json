@@ -50,6 +50,12 @@
     },
     "imageUrlSnapshot": {
       "type": "text"
+    },
+    "order_imprime": {
+      "type": "relation",
+      "relation": "oneToOne",
+      "target": "api::order-imprime.order-imprime",
+      "mappedBy": "order_item"
     }
   }
 }

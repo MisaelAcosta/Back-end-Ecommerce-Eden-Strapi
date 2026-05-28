@@ -590,6 +590,78 @@ export interface ApiGlobalGlobal extends Struct.SingleTypeSchema {
   };
 }
 
+export interface ApiOrderImprimeOrderImprime
+  extends Struct.CollectionTypeSchema {
+  collectionName: 'order_imprimes';
+  info: {
+    displayName: 'OrderImprime';
+    pluralName: 'order-imprimes';
+    singularName: 'order-imprime';
+  };
+  options: {
+    draftAndPublish: true;
+  };
+  attributes: {
+    amsReferenceLink: Schema.Attribute.Text;
+    color: Schema.Attribute.String;
+    colorMode: Schema.Attribute.Enumeration<['single', 'multi']> &
+      Schema.Attribute.DefaultTo<'single'>;
+    createdAt: Schema.Attribute.DateTime;
+    createdBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
+      Schema.Attribute.Private;
+    depthCm: Schema.Attribute.Decimal;
+    electricityCost: Schema.Attribute.Decimal;
+    electricityCostPerKwh: Schema.Attribute.Decimal;
+    filamentCost: Schema.Attribute.Decimal;
+    filamentId: Schema.Attribute.String;
+    fileId: Schema.Attribute.String;
+    fileName: Schema.Attribute.String;
+    fitsPrinter: Schema.Attribute.Boolean;
+    heightCm: Schema.Attribute.Decimal;
+    locale: Schema.Attribute.String & Schema.Attribute.Private;
+    localizations: Schema.Attribute.Relation<
+      'oneToMany',
+      'api::order-imprime.order-imprime'
+    > &
+      Schema.Attribute.Private;
+    markupMultiplier: Schema.Attribute.Decimal;
+    material: Schema.Attribute.String;
+    modelPrice: Schema.Attribute.Decimal;
+    notes: Schema.Attribute.JSON;
+    order: Schema.Attribute.Relation<'manyToOne', 'api::order.order'>;
+    order_item: Schema.Attribute.Relation<
+      'oneToOne',
+      'api::order-item.order-item'
+    >;
+    orderImprimeNumber: Schema.Attribute.UID;
+    postProcess: Schema.Attribute.Enumeration<['none', 'basic', 'advanced']> &
+      Schema.Attribute.DefaultTo<'none'>;
+    postProcessLabel: Schema.Attribute.String;
+    postProcessPrice: Schema.Attribute.Decimal;
+    postProcessReferenceLink: Schema.Attribute.Text;
+    printerId: Schema.Attribute.String;
+    printerPowerWatts: Schema.Attribute.Integer;
+    printTimeSeconds: Schema.Attribute.Integer;
+    profit: Schema.Attribute.Decimal;
+    publishedAt: Schema.Attribute.DateTime;
+    quality: Schema.Attribute.String;
+    qualityLabel: Schema.Attribute.String;
+    quoteId: Schema.Attribute.String;
+    rawPrintCost: Schema.Attribute.Decimal;
+    scalePercent: Schema.Attribute.Integer;
+    status: Schema.Attribute.Enumeration<
+      ['quoted', 'paid', 'printing', 'done', 'cancelled']
+    > &
+      Schema.Attribute.DefaultTo<'quoted'>;
+    total: Schema.Attribute.Decimal;
+    updatedAt: Schema.Attribute.DateTime;
+    updatedBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
+      Schema.Attribute.Private;
+    weightGrams: Schema.Attribute.Decimal;
+    widthCm: Schema.Attribute.Decimal;
+  };
+}
+
 export interface ApiOrderItemOrderItem extends Struct.CollectionTypeSchema {
   collectionName: 'order_items';
   info: {
@@ -613,6 +685,10 @@ export interface ApiOrderItemOrderItem extends Struct.CollectionTypeSchema {
     > &
       Schema.Attribute.Private;
     order: Schema.Attribute.Relation<'manyToOne', 'api::order.order'>;
+    order_imprime: Schema.Attribute.Relation<
+      'oneToOne',
+      'api::order-imprime.order-imprime'
+    >;
     orderItemName: Schema.Attribute.String;
     productNameSnapshot: Schema.Attribute.String;
     publishedAt: Schema.Attribute.DateTime;
@@ -657,6 +733,10 @@ export interface ApiOrderOrder extends Struct.CollectionTypeSchema {
       Schema.Attribute.Private;
     nota: Schema.Attribute.Text;
     numero: Schema.Attribute.String;
+    order_imprimes: Schema.Attribute.Relation<
+      'oneToMany',
+      'api::order-imprime.order-imprime'
+    >;
     order_items: Schema.Attribute.Relation<
       'oneToMany',
       'api::order-item.order-item'
@@ -1433,6 +1513,7 @@ declare module '@strapi/strapi' {
       'api::block2.block2': ApiBlock2Block2;
       'api::category.category': ApiCategoryCategory;
       'api::global.global': ApiGlobalGlobal;
+      'api::order-imprime.order-imprime': ApiOrderImprimeOrderImprime;
       'api::order-item.order-item': ApiOrderItemOrderItem;
       'api::order.order': ApiOrderOrder;
       'api::product.product': ApiProductProduct;

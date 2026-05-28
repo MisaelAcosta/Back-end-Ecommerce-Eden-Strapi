@@ -1,0 +1,135 @@
+{
+  "kind": "collectionType",
+  "collectionName": "order_imprimes",
+  "info": {
+    "singularName": "order-imprime",
+    "pluralName": "order-imprimes",
+    "displayName": "OrderImprime"
+  },
+  "options": {
+    "draftAndPublish": true
+  },
+  "pluginOptions": {},
+  "attributes": {
+    "orderImprimeNumber": {
+      "type": "uid"
+    },
+    "order": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "api::order.order",
+      "inversedBy": "order_imprimes"
+    },
+    "order_item": {
+      "type": "relation",
+      "relation": "oneToOne",
+      "target": "api::order-item.order-item",
+      "inversedBy": "order_imprime"
+    },
+    "fileName": {
+      "type": "string"
+    },
+    "fileId": {
+      "type": "string"
+    },
+    "quoteId": {
+      "type": "string"
+    },
+    "printerId": {
+      "type": "string"
+    },
+    "filamentId": {
+      "type": "string"
+    },
+    "material": {
+      "type": "string"
+    },
+    "color": {
+      "type": "string"
+    },
+    "colorMode": {
+      "type": "enumeration",
+      "enum": ["single", "multi"],
+      "default": "single"
+    },
+    "quality": {
+      "type": "string"
+    },
+    "qualityLabel": {
+      "type": "string"
+    },
+    "scalePercent": {
+      "type": "integer"
+    },
+    "widthCm": {
+      "type": "decimal"
+    },
+    "heightCm": {
+      "type": "decimal"
+    },
+    "depthCm": {
+      "type": "decimal"
+    },
+    "printTimeSeconds": {
+      "type": "integer"
+    },
+    "weightGrams": {
+      "type": "decimal"
+    },
+    "rawPrintCost": {
+      "type": "decimal"
+    },
+    "filamentCost": {
+      "type": "decimal"
+    },
+    "electricityCost": {
+      "type": "decimal"
+    },
+    "electricityCostPerKwh": {
+      "type": "decimal"
+    },
+    "printerPowerWatts": {
+      "type": "integer"
+    },
+    "markupMultiplier": {
+      "type": "decimal"
+    },
+    "profit": {
+      "type": "decimal"
+    },
+    "modelPrice": {
+      "type": "decimal"
+    },
+    "postProcess": {
+      "type": "enumeration",
+      "enum": ["none", "basic", "advanced"],
+      "default": "none"
+    },
+    "postProcessLabel": {
+      "type": "string"
+    },
+    "postProcessPrice": {
+      "type": "decimal"
+    },
+    "postProcessReferenceLink": {
+      "type": "text"
+    },
+    "amsReferenceLink": {
+      "type": "text"
+    },
+    "total": {
+      "type": "decimal"
+    },
+    "fitsPrinter": {
+      "type": "boolean"
+    },
+    "notes": {
+      "type": "json"
+    },
+    "status": {
+      "type": "enumeration",
+      "enum": ["quoted", "paid", "printing", "done", "cancelled"],
+      "default": "quoted"
+    }
+  }
+}
