@@ -55,9 +55,6 @@
     "quality": {
       "type": "string"
     },
-    "qualityLabel": {
-      "type": "string"
-    },
     "scalePercent": {
       "type": "integer"
     },
@@ -85,16 +82,7 @@
     "electricityCost": {
       "type": "decimal"
     },
-    "electricityCostPerKwh": {
-      "type": "decimal"
-    },
-    "printerPowerWatts": {
-      "type": "integer"
-    },
     "markupMultiplier": {
-      "type": "decimal"
-    },
-    "profit": {
       "type": "decimal"
     },
     "modelPrice": {

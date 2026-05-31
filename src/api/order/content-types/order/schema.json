@@ -95,6 +95,9 @@
     "paidAt": {
       "type": "date"
     },
+    "saleEmailSentAt": {
+      "type": "datetime"
+    },
     "order_items": {
       "type": "relation",
       "relation": "oneToMany",
