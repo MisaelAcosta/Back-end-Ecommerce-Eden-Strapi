@@ -611,7 +611,6 @@ export interface ApiOrderImprimeOrderImprime
       Schema.Attribute.Private;
     depthCm: Schema.Attribute.Decimal;
     electricityCost: Schema.Attribute.Decimal;
-    electricityCostPerKwh: Schema.Attribute.Decimal;
     filamentCost: Schema.Attribute.Decimal;
     filamentId: Schema.Attribute.String;
     fileId: Schema.Attribute.String;
@@ -640,12 +639,9 @@ export interface ApiOrderImprimeOrderImprime
     postProcessPrice: Schema.Attribute.Decimal;
     postProcessReferenceLink: Schema.Attribute.Text;
     printerId: Schema.Attribute.String;
-    printerPowerWatts: Schema.Attribute.Integer;
     printTimeSeconds: Schema.Attribute.Integer;
-    profit: Schema.Attribute.Decimal;
     publishedAt: Schema.Attribute.DateTime;
     quality: Schema.Attribute.String;
-    qualityLabel: Schema.Attribute.String;
     quoteId: Schema.Attribute.String;
     rawPrintCost: Schema.Attribute.Decimal;
     scalePercent: Schema.Attribute.Integer;
@@ -717,6 +713,7 @@ export interface ApiOrderOrder extends Struct.CollectionTypeSchema {
   attributes: {
     calle: Schema.Attribute.String;
     commerceOrder: Schema.Attribute.String;
+    completedAt: Schema.Attribute.DateTime;
     comuna: Schema.Attribute.String;
     createdAt: Schema.Attribute.DateTime;
     createdBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
@@ -726,8 +723,13 @@ export interface ApiOrderOrder extends Struct.CollectionTypeSchema {
       'plugin::users-permissions.user'
     >;
     customerName: Schema.Attribute.String;
+    deliveredAt: Schema.Attribute.DateTime;
     depto: Schema.Attribute.String;
     flowToken: Schema.Attribute.String;
+    fulfillmentStatus: Schema.Attribute.Enumeration<
+      ['PENDING_SHIPPING', 'DELIVERED', 'COMPLETED']
+    > &
+      Schema.Attribute.DefaultTo<'PENDING_SHIPPING'>;
     locale: Schema.Attribute.String & Schema.Attribute.Private;
     localizations: Schema.Attribute.Relation<'oneToMany', 'api::order.order'> &
       Schema.Attribute.Private;
@@ -752,6 +754,7 @@ export interface ApiOrderOrder extends Struct.CollectionTypeSchema {
     region: Schema.Attribute.String;
     rutBody: Schema.Attribute.String;
     rutDv: Schema.Attribute.String;
+    saleEmailSentAt: Schema.Attribute.DateTime;
     shippingCost: Schema.Attribute.Integer;
     slug: Schema.Attribute.UID<'orderName'>;
     statusOrder: Schema.Attribute.Enumeration<
@@ -760,6 +763,7 @@ export interface ApiOrderOrder extends Struct.CollectionTypeSchema {
       Schema.Attribute.DefaultTo<'PENDING_PAYMENT'>;
     subtotal: Schema.Attribute.Integer;
     total: Schema.Attribute.Integer;
+    trackingNumber: Schema.Attribute.String;
     updatedAt: Schema.Attribute.DateTime;
     updatedBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
       Schema.Attribute.Private;

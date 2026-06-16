@@ -1,6 +1,11 @@
 // config/plugins.ts
 
 export default ({ env }) => ({
+  "order-dashboard": {
+    enabled: true,
+    resolve: "./src/plugins/order-dashboard",
+  },
+
   email: {
     config: {
       provider: "nodemailer",

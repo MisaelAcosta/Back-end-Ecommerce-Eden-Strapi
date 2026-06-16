@@ -95,6 +95,24 @@
     "paidAt": {
       "type": "date"
     },
+    "fulfillmentStatus": {
+      "type": "enumeration",
+      "default": "PENDING_SHIPPING",
+      "enum": [
+        "PENDING_SHIPPING",
+        "DELIVERED",
+        "COMPLETED"
+      ]
+    },
+    "trackingNumber": {
+      "type": "string"
+    },
+    "deliveredAt": {
+      "type": "datetime"
+    },
+    "completedAt": {
+      "type": "datetime"
+    },
     "saleEmailSentAt": {
       "type": "datetime"
     },

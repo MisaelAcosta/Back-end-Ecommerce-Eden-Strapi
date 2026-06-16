@@ -1,0 +1,11 @@
+{
+  "name": "order-dashboard",
+  "version": "0.1.0",
+  "private": true,
+  "strapi": {
+    "name": "order-dashboard",
+    "displayName": "Order Dashboard",
+    "description": "Admin dashboard for paid orders",
+    "kind": "plugin"
+  }
+}
