@@ -138,6 +138,7 @@ node_modules
 # entorno
 .env
 .env.*
+referencia/
 
 # logs
 npm-debug.log*

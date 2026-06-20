@@ -35,115 +35,6 @@ const blackTheme = {
   },
 };
 
-const installLoginPersistenceFallback = () => {
-  const windowWithFallback = window as Window & {
-    __edenLoginPersistenceFallbackInstalled?: boolean;
-  };
-
-  if (windowWithFallback.__edenLoginPersistenceFallbackInstalled) {
-    return;
-  }
-
-  windowWithFallback.__edenLoginPersistenceFallbackInstalled = true;
-  const originalFetch = window.fetch.bind(window);
-
-  const normalizeToken = (storedToken: string | null) => {
-    if (!storedToken) {
-      return null;
-    }
-
-    try {
-      const parsedToken = JSON.parse(storedToken);
-
-      return typeof parsedToken === 'string' ? parsedToken : storedToken;
-    } catch {
-      return storedToken;
-    }
-  };
-
-  const getCookieToken = () => {
-    const tokenCookie = document.cookie
-      .split(';')
-      .map((cookie) => cookie.trim())
-      .find((cookie) => cookie.startsWith('jwtToken='));
-
-    return tokenCookie ? decodeURIComponent(tokenCookie.split('=').slice(1).join('=')) : null;
-  };
-
-  const persistAdminToken = (token: string) => {
-    const normalizedToken = normalizeToken(token);
-
-    if (!normalizedToken) {
-      return;
-    }
-
-    window.localStorage.setItem('jwtToken', JSON.stringify(normalizedToken));
-    window.localStorage.setItem('isLoggedIn', 'true');
-    window.sessionStorage.setItem('jwtToken', JSON.stringify(normalizedToken));
-    document.cookie = `jwtToken=${encodeURIComponent(normalizedToken)}; Path=/`;
-  };
-
-  const hydratePersistedToken = () => {
-    const existingToken =
-      normalizeToken(window.localStorage.getItem('jwtToken')) ||
-      normalizeToken(window.sessionStorage.getItem('jwtToken')) ||
-      getCookieToken();
-
-    if (!existingToken) {
-      return;
-    }
-
-    persistAdminToken(existingToken);
-
-    if (window.location.pathname.endsWith('/auth/login')) {
-      window.setTimeout(() => {
-        window.location.assign('/admin/');
-      }, 100);
-    }
-  };
-
-  hydratePersistedToken();
-
-  /*
-   * Fallback para deploy:
-   * Strapi normalmente guarda el token del login en cookie o localStorage.
-   * En Seenode el login responde 200 con token, pero el admin vuelve al login
-   * porque ese token no queda persistido. Este interceptor solo actua sobre
-   * /admin/login y /admin/renew-token y replica el guardado esperado por Strapi.
-   */
-  window.fetch = async (input, init) => {
-    const response = await originalFetch(input, init);
-    const requestUrl = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url;
-
-    const isAuthPersistenceRequest = requestUrl.includes('/admin/login') || requestUrl.includes('/admin/renew-token');
-
-    if (!isAuthPersistenceRequest || !response.ok) {
-      return response;
-    }
-
-    try {
-      const body = await response.clone().json();
-      const token = body?.data?.token;
-
-      if (typeof token !== 'string' || token.length === 0) {
-        return response;
-      }
-
-      persistAdminToken(token);
-
-      if (window.location.pathname.endsWith('/auth/login')) {
-        window.setTimeout(() => {
-          window.location.assign('/admin/');
-        }, 250);
-      }
-    } catch {
-      // Si el body no es JSON o cambia el contrato de Strapi, dejamos que el flujo original continue.
-    }
-
-    return response;
-  };
-};
-
 export default {
   config: {
     // Icono de Eden mostrado exclusivamente en la pestana del navegador.
@@ -226,6 +117,5 @@ export default {
   bootstrap(_app: StrapiApp) {
     // Nombre mostrado junto al favicon en la pestana del navegador.
     document.title = 'Eden Admin';
-    installLoginPersistenceFallback();
   },
 };

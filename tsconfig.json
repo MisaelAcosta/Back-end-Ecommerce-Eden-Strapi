@@ -27,6 +27,7 @@
     "dist/",
     ".cache/",
     ".tmp/",
+    "referencia/",
     "src/admin/",
     "**/*.test.*",
     "src/plugins/**"
