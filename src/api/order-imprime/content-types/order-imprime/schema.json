@@ -1,0 +1,14 @@
+{
+  "kind": "collectionType",
+  "collectionName": "order_imprimes",
+  "info": {
+    "singularName": "order-imprime",
+    "pluralName": "order-imprimes",
+    "displayName": "OrderImprime"
+  },
+  "options": {
+    "draftAndPublish": true
+  },
+  "pluginOptions": {},
+  "attributes": {}
+}
