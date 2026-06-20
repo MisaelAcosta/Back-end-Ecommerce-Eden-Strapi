@@ -66,11 +66,7 @@ export default {
         defaultMessage: 'Pedidos',
       },
       permissions: [],
-      Component: async () => {
-        const { default: OrdersDashboard } = await import('./pages/OrdersDashboard');
-
-        return { default: OrdersDashboard };
-      },
+      Component: () => import('./pages/OrdersDashboard'),
       position: 3,
     });
 
