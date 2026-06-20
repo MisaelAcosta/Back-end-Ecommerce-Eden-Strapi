@@ -35,6 +35,65 @@ const blackTheme = {
   },
 };
 
+const installLoginPersistenceFallback = () => {
+  const windowWithFallback = window as Window & {
+    __edenLoginPersistenceFallbackInstalled?: boolean;
+  };
+
+  if (windowWithFallback.__edenLoginPersistenceFallbackInstalled) {
+    return;
+  }
+
+  windowWithFallback.__edenLoginPersistenceFallbackInstalled = true;
+  const originalFetch = window.fetch.bind(window);
+
+  /*
+   * Fallback para deploy:
+   * Strapi normalmente guarda el token del login en cookie o localStorage.
+   * En Seenode el login responde 200 con token, pero el admin vuelve al login
+   * porque ese token no queda persistido. Este interceptor solo actua sobre
+   * /admin/login y replica el guardado esperado por Strapi.
+   */
+  window.fetch = async (input, init) => {
+    const response = await originalFetch(input, init);
+    const requestUrl = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url;
+
+    if (!requestUrl.includes('/admin/login') || !response.ok) {
+      return response;
+    }
+
+    try {
+      const body = await response.clone().json();
+      const token = body?.data?.token;
+
+      if (typeof token !== 'string' || token.length === 0) {
+        return response;
+      }
+
+      const rememberMeInput = document.querySelector<HTMLInputElement>('input[name="rememberMe"]');
+      const shouldPersist = rememberMeInput?.checked === true;
+
+      if (shouldPersist) {
+        window.localStorage.setItem('jwtToken', JSON.stringify(token));
+      } else {
+        document.cookie = `jwtToken=${encodeURIComponent(token)}; Path=/`;
+      }
+
+      window.localStorage.setItem('isLoggedIn', 'true');
+
+      if (window.location.pathname.endsWith('/auth/login')) {
+        window.setTimeout(() => {
+          window.location.assign('/admin/');
+        }, 50);
+      }
+    } catch {
+      // Si el body no es JSON o cambia el contrato de Strapi, dejamos que el flujo original continue.
+    }
+
+    return response;
+  };
+};
+
 export default {
   config: {
     // Icono de Eden mostrado exclusivamente en la pestana del navegador.
@@ -117,5 +176,6 @@ export default {
   bootstrap(_app: StrapiApp) {
     // Nombre mostrado junto al favicon en la pestana del navegador.
     document.title = 'Eden Admin';
+    installLoginPersistenceFallback();
   },
 };
