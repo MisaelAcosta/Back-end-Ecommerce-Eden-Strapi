@@ -47,12 +47,62 @@ const installLoginPersistenceFallback = () => {
   windowWithFallback.__edenLoginPersistenceFallbackInstalled = true;
   const originalFetch = window.fetch.bind(window);
 
-  const persistAdminToken = (token: string) => {
-    window.localStorage.setItem('jwtToken', JSON.stringify(token));
-    window.localStorage.setItem('isLoggedIn', 'true');
-    window.sessionStorage.setItem('jwtToken', JSON.stringify(token));
-    document.cookie = `jwtToken=${encodeURIComponent(token)}; Path=/`;
+  const normalizeToken = (storedToken: string | null) => {
+    if (!storedToken) {
+      return null;
+    }
+
+    try {
+      const parsedToken = JSON.parse(storedToken);
+
+      return typeof parsedToken === 'string' ? parsedToken : storedToken;
+    } catch {
+      return storedToken;
+    }
   };
+
+  const getCookieToken = () => {
+    const tokenCookie = document.cookie
+      .split(';')
+      .map((cookie) => cookie.trim())
+      .find((cookie) => cookie.startsWith('jwtToken='));
+
+    return tokenCookie ? decodeURIComponent(tokenCookie.split('=').slice(1).join('=')) : null;
+  };
+
+  const persistAdminToken = (token: string) => {
+    const normalizedToken = normalizeToken(token);
+
+    if (!normalizedToken) {
+      return;
+    }
+
+    window.localStorage.setItem('jwtToken', JSON.stringify(normalizedToken));
+    window.localStorage.setItem('isLoggedIn', 'true');
+    window.sessionStorage.setItem('jwtToken', JSON.stringify(normalizedToken));
+    document.cookie = `jwtToken=${encodeURIComponent(normalizedToken)}; Path=/`;
+  };
+
+  const hydratePersistedToken = () => {
+    const existingToken =
+      normalizeToken(window.localStorage.getItem('jwtToken')) ||
+      normalizeToken(window.sessionStorage.getItem('jwtToken')) ||
+      getCookieToken();
+
+    if (!existingToken) {
+      return;
+    }
+
+    persistAdminToken(existingToken);
+
+    if (window.location.pathname.endsWith('/auth/login')) {
+      window.setTimeout(() => {
+        window.location.assign('/admin/');
+      }, 100);
+    }
+  };
+
+  hydratePersistedToken();
 
   /*
    * Fallback para deploy:
