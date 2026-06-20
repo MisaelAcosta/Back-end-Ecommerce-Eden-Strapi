@@ -47,18 +47,27 @@ const installLoginPersistenceFallback = () => {
   windowWithFallback.__edenLoginPersistenceFallbackInstalled = true;
   const originalFetch = window.fetch.bind(window);
 
+  const persistAdminToken = (token: string) => {
+    window.localStorage.setItem('jwtToken', JSON.stringify(token));
+    window.localStorage.setItem('isLoggedIn', 'true');
+    window.sessionStorage.setItem('jwtToken', JSON.stringify(token));
+    document.cookie = `jwtToken=${encodeURIComponent(token)}; Path=/`;
+  };
+
   /*
    * Fallback para deploy:
    * Strapi normalmente guarda el token del login en cookie o localStorage.
    * En Seenode el login responde 200 con token, pero el admin vuelve al login
    * porque ese token no queda persistido. Este interceptor solo actua sobre
-   * /admin/login y replica el guardado esperado por Strapi.
+   * /admin/login y /admin/renew-token y replica el guardado esperado por Strapi.
    */
   window.fetch = async (input, init) => {
     const response = await originalFetch(input, init);
     const requestUrl = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url;
 
-    if (!requestUrl.includes('/admin/login') || !response.ok) {
+    const isAuthPersistenceRequest = requestUrl.includes('/admin/login') || requestUrl.includes('/admin/renew-token');
+
+    if (!isAuthPersistenceRequest || !response.ok) {
       return response;
     }
 
@@ -70,21 +79,12 @@ const installLoginPersistenceFallback = () => {
         return response;
       }
 
-      const rememberMeInput = document.querySelector<HTMLInputElement>('input[name="rememberMe"]');
-      const shouldPersist = rememberMeInput?.checked === true;
-
-      if (shouldPersist) {
-        window.localStorage.setItem('jwtToken', JSON.stringify(token));
-      } else {
-        document.cookie = `jwtToken=${encodeURIComponent(token)}; Path=/`;
-      }
-
-      window.localStorage.setItem('isLoggedIn', 'true');
+      persistAdminToken(token);
 
       if (window.location.pathname.endsWith('/auth/login')) {
         window.setTimeout(() => {
           window.location.assign('/admin/');
-        }, 50);
+        }, 250);
       }
     } catch {
       // Si el body no es JSON o cambia el contrato de Strapi, dejamos que el flujo original continue.
