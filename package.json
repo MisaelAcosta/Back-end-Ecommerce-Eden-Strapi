@@ -12,8 +12,8 @@
     "seed:example": "node ./scripts/seed.js",
     "start": "strapi start",
     "strapi": "strapi",
-    "upgrade": "pnpm dlx @strapi/upgrade latest",
-    "upgrade:dry": "pnpm dlx @strapi/upgrade latest --dry"
+    "upgrade": "npx @strapi/upgrade latest",
+    "upgrade:dry": "npx @strapi/upgrade latest --dry"
   },
   "dependencies": {
     "@strapi/plugin-cloud": "5.23.4",
@@ -23,7 +23,6 @@
     "@strapi/strapi": "5.23.4",
     "better-sqlite3": "11.3.0",
     "fs-extra": "^10.0.0",
-    "lucide-react": "^1.17.0",
     "mime-types": "^2.1.27",
     "pg": "^8.16.3",
     "react": "^18.0.0",
@@ -37,19 +36,9 @@
     "@types/react-dom": "^18",
     "typescript": "^5"
   },
-  "packageManager": "pnpm@10.34.1",
   "engines": {
     "node": ">=18.0.0 <=22.x.x",
-    "pnpm": ">=10.34.1"
-  },
-  "pnpm": {
-    "onlyBuiltDependencies": [
-      "@swc/core",
-      "better-sqlite3",
-      "core-js-pure",
-      "esbuild",
-      "sharp"
-    ]
+    "npm": ">=6.0.0"
   },
   "strapi": {
     "uuid": "67d82fa6-cfbd-494d-b8ea-ea73678b551f",
