@@ -25,3 +25,33 @@ img[src^="data:image/svg+xml,%3csvg%20width='63'%20height='63'"] {
   filter: brightness(0) saturate(100%) invert(89%) sepia(94%) saturate(1671%)
     hue-rotate(27deg) brightness(105%) contrast(104%);
 }
+
+/*
+ * ICONO MARKETPLACE DEL MENU LATERAL
+ * Marketplace es un link general interno de Strapi, no viene del array de
+ * plugins que editamos en app.tsx. Por eso se reemplaza visualmente aqui:
+ * ocultamos su SVG nativo y pintamos el icono lucide/shopping-bag encima.
+ */
+nav a[href$="/marketplace"] svg {
+  opacity: 0;
+}
+
+nav a[href$="/marketplace"]::after {
+  content: "";
+  width: 20px;
+  height: 20px;
+  position: absolute;
+  inset: 50% auto auto 50%;
+  transform: translate(-50%, -50%);
+  background-color: currentColor;
+  -webkit-mask: url("data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%2024%2024'%20fill='none'%20stroke='black'%20stroke-width='2'%20stroke-linecap='round'%20stroke-linejoin='round'%3E%3Cpath%20d='M6%202%203%206v14a2%202%200%200%200%202%202h14a2%202%200%200%200%202-2V6l-3-4Z'/%3E%3Cpath%20d='M3%206h18'/%3E%3Cpath%20d='M16%2010a4%204%200%200%201-8%200'/%3E%3C/svg%3E") center / 20px 20px no-repeat;
+  mask: url("data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%2024%2024'%20fill='none'%20stroke='black'%20stroke-width='2'%20stroke-linecap='round'%20stroke-linejoin='round'%3E%3Cpath%20d='M6%202%203%206v14a2%202%200%200%200%202%202h14a2%202%200%200%200%202-2V6l-3-4Z'/%3E%3Cpath%20d='M3%206h18'/%3E%3Cpath%20d='M16%2010a4%204%200%200%201-8%200'/%3E%3C/svg%3E") center / 20px 20px no-repeat;
+}
+
+nav a[href$="/marketplace"]:hover::after {
+  background-color: #a5a5ba;
+}
+
+nav a[href$="/marketplace"].active::after {
+  background-color: #C0FF01;
+}
