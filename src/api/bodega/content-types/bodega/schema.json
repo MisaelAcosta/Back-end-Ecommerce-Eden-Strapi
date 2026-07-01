@@ -1,0 +1,87 @@
+{
+  "kind": "collectionType",
+  "collectionName": "bodegas",
+  "info": {
+    "singularName": "bodega",
+    "pluralName": "bodegas",
+    "displayName": "Bodega",
+    "description": "Datos de costos y retorno por variante para inventario y metricas"
+  },
+  "options": {
+    "draftAndPublish": false
+  },
+  "pluginOptions": {},
+  "attributes": {
+    "bodegaName": {
+      "type": "string"
+    },
+    "variantDocumentId": {
+      "type": "string",
+      "required": true,
+      "unique": true
+    },
+    "productDocumentId": {
+      "type": "string"
+    },
+    "categoryDocumentId": {
+      "type": "string"
+    },
+    "variantNameSnapshot": {
+      "type": "string"
+    },
+    "productNameSnapshot": {
+      "type": "string"
+    },
+    "categoryNameSnapshot": {
+      "type": "string"
+    },
+    "imageUrlSnapshot": {
+      "type": "text"
+    },
+    "materialGrams": {
+      "type": "decimal"
+    },
+    "printTimeHours": {
+      "type": "decimal"
+    },
+    "printTimeLabel": {
+      "type": "string"
+    },
+    "materialCost": {
+      "type": "integer"
+    },
+    "lightCost": {
+      "type": "integer"
+    },
+    "boxCost": {
+      "type": "integer"
+    },
+    "paintCost": {
+      "type": "integer"
+    },
+    "totalCost": {
+      "type": "integer"
+    },
+    "price": {
+      "type": "integer"
+    },
+    "returnAmount": {
+      "type": "integer"
+    },
+    "variant": {
+      "type": "relation",
+      "relation": "oneToOne",
+      "target": "api::variant.variant"
+    },
+    "product": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "api::product.product"
+    },
+    "category": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "api::category.category"
+    }
+  }
+}

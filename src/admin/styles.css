@@ -1,13 +1,41 @@
 svg [stroke="#4945ff"],
 svg [stroke="#7b79ff"],
 svg [stroke="#271fe0"],
-svg [stroke="rgb(39, 31, 224)"],
+svg [stroke="rgb(39, 31, 224)"] {
+  stroke: #C0FF01;
+}
+
 svg [fill="#4945ff"],
 svg [fill="#7b79ff"],
 svg [fill="#271fe0"],
 svg [fill="rgb(39, 31, 224)"] {
-  stroke: #C0FF01;
   fill: #C0FF01;
+}
+
+/*
+ * ICONOS LUCIDE DEL MENU LATERAL
+ * Lucide debe verse como linea, sin relleno. El link activo ya da el fondo
+ * verde oscuro desde Strapi; aqui solo aseguramos que el icono pinte su stroke
+ * con el color activo y no rellene la figura.
+ */
+nav a svg.lucide,
+nav a svg.lucide * {
+  fill: none !important;
+  stroke: currentColor !important;
+}
+
+nav a.active svg.lucide,
+nav a[aria-current="page"] svg.lucide {
+  color: #C0FF01;
+}
+
+nav a[href$="/plugins/warehouse"].active,
+nav a[href$="/plugins/metrics"].active,
+nav a[href$="/plugins/order-dashboard"].active,
+nav a[href$="/plugins/warehouse"][aria-current="page"],
+nav a[href$="/plugins/metrics"][aria-current="page"],
+nav a[href$="/plugins/order-dashboard"][aria-current="page"] {
+  color: #C0FF01;
 }
 
 [role="progressbar"] svg,

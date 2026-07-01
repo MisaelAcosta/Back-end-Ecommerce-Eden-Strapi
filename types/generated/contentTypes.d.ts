@@ -515,6 +515,57 @@ export interface ApiBlock2Block2 extends Struct.CollectionTypeSchema {
   };
 }
 
+export interface ApiBodegaBodega extends Struct.CollectionTypeSchema {
+  collectionName: 'bodegas';
+  info: {
+    description: 'Datos de costos y retorno por variante para inventario y metricas';
+    displayName: 'Bodega';
+    pluralName: 'bodegas';
+    singularName: 'bodega';
+  };
+  options: {
+    draftAndPublish: false;
+  };
+  attributes: {
+    bodegaName: Schema.Attribute.String;
+    boxCost: Schema.Attribute.Integer;
+    category: Schema.Attribute.Relation<'manyToOne', 'api::category.category'>;
+    categoryDocumentId: Schema.Attribute.String;
+    categoryNameSnapshot: Schema.Attribute.String;
+    createdAt: Schema.Attribute.DateTime;
+    createdBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
+      Schema.Attribute.Private;
+    imageUrlSnapshot: Schema.Attribute.Text;
+    lightCost: Schema.Attribute.Integer;
+    locale: Schema.Attribute.String & Schema.Attribute.Private;
+    localizations: Schema.Attribute.Relation<
+      'oneToMany',
+      'api::bodega.bodega'
+    > &
+      Schema.Attribute.Private;
+    materialCost: Schema.Attribute.Integer;
+    materialGrams: Schema.Attribute.Decimal;
+    paintCost: Schema.Attribute.Integer;
+    price: Schema.Attribute.Integer;
+    printTimeHours: Schema.Attribute.Decimal;
+    printTimeLabel: Schema.Attribute.String;
+    product: Schema.Attribute.Relation<'manyToOne', 'api::product.product'>;
+    productDocumentId: Schema.Attribute.String;
+    productNameSnapshot: Schema.Attribute.String;
+    publishedAt: Schema.Attribute.DateTime;
+    returnAmount: Schema.Attribute.Integer;
+    totalCost: Schema.Attribute.Integer;
+    updatedAt: Schema.Attribute.DateTime;
+    updatedBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
+      Schema.Attribute.Private;
+    variant: Schema.Attribute.Relation<'oneToOne', 'api::variant.variant'>;
+    variantDocumentId: Schema.Attribute.String &
+      Schema.Attribute.Required &
+      Schema.Attribute.Unique;
+    variantNameSnapshot: Schema.Attribute.String;
+  };
+}
+
 export interface ApiCategoryCategory extends Struct.CollectionTypeSchema {
   collectionName: 'categories';
   info: {
@@ -1515,6 +1566,7 @@ declare module '@strapi/strapi' {
       'api::author.author': ApiAuthorAuthor;
       'api::block1.block1': ApiBlock1Block1;
       'api::block2.block2': ApiBlock2Block2;
+      'api::bodega.bodega': ApiBodegaBodega;
       'api::category.category': ApiCategoryCategory;
       'api::global.global': ApiGlobalGlobal;
       'api::order-imprime.order-imprime': ApiOrderImprimeOrderImprime;

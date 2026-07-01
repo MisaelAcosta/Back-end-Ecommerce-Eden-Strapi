@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useFetchClient } from '@strapi/admin/strapi-admin';
-import { Book, BookOpen, Copy } from 'lucide-react';
+import { Book, BookOpen, Copy, Frown, Meh, Package, Plus, Smile, Truck } from 'lucide-react';
 
 type Customer = {
   name?: string | null;
@@ -364,20 +364,20 @@ export default function OrdersDashboard() {
           {/* Encabezado superior: titulo, descripcion, total de activos y resumen por prioridad. */}
           <header style={styles.salesHeader}>
             <div>
-              <h1 style={styles.title}>VENTAS</h1>
-              <p style={styles.description}>Revisa todos tus pedidos, completalos y por entregar</p>
+              <h1 style={styles.title}>Ventas</h1>
+              <p style={styles.description}>Revisa todos tus pedidos</p>
             </div>
 
-            {/* Resumen derecho: total de pedidos activos + contadores rojo/amarillo/verde. */}
+            {/* Resumen derecho: estados por prioridad + total de activos. */}
             <div style={styles.summaryWrap}>
+              <div style={styles.statusSummary}>
+                <StatusCount count={counts.low} tone="happy" />
+                <StatusCount count={counts.medium} tone="neutral" />
+                <StatusCount count={counts.high} tone="sad" />
+              </div>
               <div style={styles.totalSummary}>
                 <strong style={styles.totalSummaryValue}>{counts.total}</strong>
-                <span>ACTIVOS</span>
-              </div>
-              <div style={styles.prioritySummary}>
-                <PriorityCount count={counts.high} color={PRIORITY_META.high.color} />
-                <PriorityCount count={counts.medium} color={PRIORITY_META.medium.color} />
-                <PriorityCount count={counts.low} color={PRIORITY_META.low.color} />
+                <span>Activos</span>
               </div>
             </div>
           </header>
@@ -391,39 +391,26 @@ export default function OrdersDashboard() {
                 onClick={() => setActiveView('pendingShipping')}
                 style={{ ...styles.tab, ...(activeView === 'pendingShipping' ? styles.tabActive : {}) }}
               >
-                PTE. ENVIO
-              </button>
-              <button
-                type="button"
-                onClick={() => setActiveView('pendingDelivery')}
-                style={{ ...styles.tab, ...(activeView === 'pendingDelivery' ? styles.tabActive : {}) }}
-              >
-                PTE. ENTREGA
+                <span style={styles.tabIcon}>
+                  <Truck size={18} strokeWidth={1.7} />
+                </span>
+                Pte. envio
               </button>
               <button
                 type="button"
                 onClick={() => setActiveView('delivered')}
                 style={{ ...styles.tab, ...(activeView === 'delivered' ? styles.tabActive : {}) }}
               >
-                ENTREGADOS
+                <span style={styles.tabIcon}>
+                  <Package size={18} strokeWidth={1.7} />
+                </span>
+                Entregados
               </button>
             </nav>
 
-            {/* Filtro de prioridad. El select esta invisible para conservar el diseno tipo texto + flecha. */}
-            <label style={styles.priorityFilter}>
-              PRIORIDAD
-              <select
-                value={priorityFilter}
-                onChange={(event) => setPriorityFilter(event.target.value as 'all' | Priority)}
-                style={styles.prioritySelect}
-              >
-                <option value="all">Todas</option>
-                <option value="high">Alta</option>
-                <option value="medium">Media</option>
-                <option value="low">Baja</option>
-              </select>
-              <span aria-hidden="true">-&gt;</span>
-            </label>
+            <button type="button" style={styles.addButton} aria-label="Crear pedido">
+              <Plus size={22} strokeWidth={1.7} />
+            </button>
           </div>
 
           {error ? <div style={styles.error}>{error}</div> : null}
@@ -453,23 +440,24 @@ export default function OrdersDashboard() {
                     onClick={() => setSelectedId(id)}
                     style={{ ...styles.orderCard, ...(isSelected ? styles.orderCardActive : {}) }}
                   >
-                    {/* Barra de color de prioridad. Su posicion exacta se mueve en styles.priorityBar. */}
-                    <span style={{ ...styles.priorityBar, background: meta.color }} />
+                    {/* Icono de estado/prioridad de la tarjeta. */}
+                    <span style={{ ...styles.cardStatusIcon, color: meta.color, borderColor: meta.color }}>
+                      {priority === 'low' ? <Smile size={18} strokeWidth={1.8} /> : priority === 'medium' ? <Meh size={18} strokeWidth={1.8} /> : <Frown size={18} strokeWidth={1.8} />}
+                    </span>
 
                     {/* Contenido principal de la tarjeta: numero, cliente, fecha, total y cantidad. */}
                     <div style={styles.orderContent}>
                       <span style={styles.orderId}>{getOrderLabel(order)}</span>
                       <span style={styles.customerName}>{order.customer?.name || 'Cliente sin nombre'}</span>
                       <span style={{ ...styles.orderDate, color: meta.text }}>{formatShortDate(order.createdAt || order.paidAt)}</span>
-                      <div style={styles.orderBottom}>
-                        <span>{formatMoney(order.total)}</span>
-                        <span>Cantidad: {getOrderQuantity(order)}</span>
-                      </div>
+                      <span style={styles.orderTotal}>{formatMoney(order.total)}</span>
+                      <span style={styles.orderQuantity}>Cantidad: {getOrderQuantity(order)}</span>
                     </div>
 
-                    {/* Columna lateral vertical: muestra PRODUCTO o IMPRIME segun el tipo de pedido. */}
-                    <div style={styles.orderSide}>
-                      <span style={styles.orderKind}>{getOrderKind(order)}</span>
+                    <div style={styles.orderFooter}>
+                      <span style={styles.orderFooterText}>Venta</span>
+                      <span style={{ ...styles.orderFooterText, borderLeft: '1px solid #444444', borderRight: '1px solid #444444' }}>Web</span>
+                      <span style={styles.orderFooterText}>Envio</span>
                     </div>
                   </button>
                 );
@@ -485,9 +473,10 @@ export default function OrdersDashboard() {
               {/* Seccion CLIENTE: estos campos son los unicos con boton para copiar. */}
               <section style={styles.detailBlock}>
                 <div style={styles.detailTitleRow}>
-                  <h2 style={styles.detailTitle}>CLIENTE</h2>
+                  <h2 style={styles.detailTitle}>Datos</h2>
                   <span style={styles.paidBadge}>PAID</span>
                 </div>
+                <h3 style={styles.detailSectionTitle}>Cliente</h3>
                 <div style={styles.detailGrid}>
                   <DetailField label="Nombre" value={selectedOrder.customer?.name || 'Sin nombre'} copyable onCopied={showToast} />
                   <DetailField label="Rut" value={selectedOrder.customer?.rut || 'Sin RUT'} copyable onCopied={showToast} />
@@ -502,7 +491,7 @@ export default function OrdersDashboard() {
 
               {/* Seccion PEDIDO: resumen monetario y fecha de pago. No lleva copiar. */}
               <section style={styles.detailBlock}>
-                <h2 style={styles.detailTitle}>PEDIDO</h2>
+                <h2 style={styles.detailSectionTitle}>Pedido</h2>
                 <div style={styles.detailGrid}>
                   <DetailField label="Total" value={formatMoney(selectedOrder.total)} />
                   <DetailField label="Subtotal" value={formatMoney(selectedOrder.subtotal)} />
@@ -515,7 +504,7 @@ export default function OrdersDashboard() {
 
               {/* Seccion PRODUCTO: lista todos los productos/imprimes del pedido seleccionado. */}
               <section style={styles.detailBlock}>
-                <h2 style={styles.detailTitle}>PRODUCTO</h2>
+                <h2 style={styles.detailSectionTitle}>Producto</h2>
                 <div style={styles.productBox}>
                   {getPrimaryProductLines(selectedOrder).map((line) => (
                     <div key={line.name} style={styles.productLine}>
@@ -531,16 +520,18 @@ export default function OrdersDashboard() {
 
               {/* Seccion de seguimiento. Por ahora es solo visual; no guarda datos todavia. */}
               <section style={styles.detailBlock}>
-                <h2 style={styles.detailTitle}>NUMERO DE SEGUIMIENTO</h2>
-                <input
-                  style={styles.trackingInput}
-                  value={trackingValue}
-                  onChange={(event) => setTrackingValue(event.target.value)}
-                  placeholder="Ingresa el numero de seguimiento"
-                />
-                <button type="button" onClick={completeSelectedOrderShipping} disabled={isSavingTracking} style={styles.completeButton}>
-                  {isSavingTracking ? 'GUARDANDO' : 'COMPLETAR'}
-                </button>
+                <h2 style={styles.detailSectionTitle}>Numero de seguimiento</h2>
+                <div style={styles.trackingRow}>
+                  <input
+                    style={styles.trackingInput}
+                    value={trackingValue}
+                    onChange={(event) => setTrackingValue(event.target.value)}
+                    placeholder="Ingresa el numero de seguimiento"
+                  />
+                  <button type="button" onClick={completeSelectedOrderShipping} disabled={isSavingTracking} style={styles.completeButton}>
+                    {isSavingTracking ? 'Guardando' : 'Ingresar'}
+                  </button>
+                </div>
               </section>
             </>
           ) : (
@@ -639,11 +630,21 @@ function DeliveredOrdersTable({
   );
 }
 
-function PriorityCount({ count, color }: { count: number; color: string }) {
+function StatusCount({ count, tone }: { count: number; tone: 'happy' | 'neutral' | 'sad' }) {
+  const toneStyles = {
+    happy: { color: '#C0FF01', Icon: Smile },
+    neutral: { color: '#d9d9d9', Icon: Meh },
+    sad: { color: '#00c853', Icon: Frown },
+  };
+  const { color, Icon } = toneStyles[tone];
+
   return (
-    // Cada bloque muestra el conteo por prioridad: alta, media y baja.
-    <div style={{ ...styles.priorityCount, background: color }}>
-      {String(count).padStart(2, '0')}
+    // Cada bloque muestra cantidad + icono de estado.
+    <div style={styles.statusCount}>
+      <span style={styles.statusCountNumber}>{String(count).padStart(2, '0')}</span>
+      <span style={{ ...styles.statusCountIcon, color, borderColor: color }}>
+        <Icon size={28} strokeWidth={1.7} />
+      </span>
     </div>
   );
 }
@@ -733,20 +734,20 @@ const styles = {
   // Cambia "gap" si quieres separar mas o menos ventas y detalle.
   shell: {
     display: 'grid',
-    gridTemplateColumns: 'minmax(0, 1fr) 428px',
-    gap: '38px',
-    maxWidth: '1750px',
+    gridTemplateColumns: 'minmax(0, 1fr) 390px',
+    gap: '20px',
+    maxWidth: '1500px',
     margin: '0 auto',
-    paddingTop: '36px',
+    paddingTop: '8px',
   },
 
   // Panel izquierdo completo donde viven titulo, tabs y tarjetas de pedidos.
   // border dibuja el marco externo fino que rodea todo el bloque de ventas.
   // Cambia el color #2b2b2b si quieres que la linea sea mas clara u oscura.
   salesPanel: {
-    height: '850px',
+    height: '920px',
     background: '#000000',
-    border: '1px solid #2b2b2b',
+    border: '1px solid #7a9f00',
     borderRadius: '0px',
     boxSizing: 'border-box' as const,
     padding: 0,
@@ -759,14 +760,17 @@ const styles = {
     justifyContent: 'space-between',
     gap: '24px',
     alignItems: 'flex-start',
-    padding: '36px 58px 24px',
+    minHeight: '118px',
+    padding: '28px 38px 18px',
+    background: '#171717',
+    borderBottom: '1px solid #2d2d2d',
   },
 
   // Titulo principal "VENTAS".
   title: {
     margin: 0,
-    fontSize: '29px',
-    fontWeight: 300,
+    fontSize: '23px',
+    fontWeight: 400,
     lineHeight: 1,
   },
 
@@ -776,31 +780,46 @@ const styles = {
     color: '#a8a8a8',
     fontSize: '12px',
     fontWeight: 300,
-    textTransform: 'uppercase' as const,
   },
 
   // Contenedor del resumen derecho: total de activos + prioridades apiladas.
   summaryWrap: {
     display: 'flex',
-    gap: '10px',
+    gap: '24px',
     alignItems: 'center',
   },
 
-  // Columna de prioridades. Actualmente se apilan: alta, media y baja.
-  prioritySummary: {
-    display: 'grid',
-    gap: '2px',
+  // Fila de estados con caritas del nuevo diseno.
+  statusSummary: {
+    display: 'flex',
+    gap: '14px',
+    padding: '14px 18px',
+    background: '#141414',
   },
 
-  // Cajita individual de cada prioridad. El color se inyecta desde PRIORITY_META.
-  priorityCount: {
+  statusCount: {
+    position: 'relative' as const,
+    display: 'grid',
+    placeItems: 'center',
+    width: '48px',
+    height: '52px',
+  },
+
+  statusCountNumber: {
+    position: 'absolute' as const,
+    top: '-10px',
+    right: '-4px',
+    color: '#ffffff',
+    fontSize: '11px',
+  },
+
+  statusCountIcon: {
     display: 'grid',
     placeItems: 'center',
     width: '38px',
-    height: '15px',
-    color: '#111111',
-    fontSize: '11px',
-    fontWeight: 700,
+    height: '38px',
+    border: '1px solid currentColor',
+    borderRadius: '999px',
   },
 
   // Bloque del numero total de pedidos activos.
@@ -809,19 +828,18 @@ const styles = {
     justifyItems: 'end',
     alignContent: 'center',
     minWidth: '44px',
-    color: '#6f6f6f',
-    fontSize: '11px',
+    color: '#898989',
+    fontSize: '13px',
     lineHeight: 1,
-    textTransform: 'uppercase' as const,
   },
 
   // Numero grande dentro del resumen de activos.
   totalSummaryValue: {
     color: '#ffffff',
-    fontSize: '17px',
-    fontWeight: 700,
+    fontSize: '22px',
+    fontWeight: 500,
     lineHeight: 1,
-    marginBottom: '4px',
+    marginBottom: '8px',
   },
 
   // Fila horizontal de navegacion: tabs a la izquierda y filtro de prioridad a la derecha.
@@ -830,16 +848,19 @@ const styles = {
     display: 'flex',
     alignItems: 'stretch',
     justifyContent: 'space-between',
-    borderTop: '1px solid #2b2b2b',
     borderBottom: '1px solid #2b2b2b',
-    minHeight: '74px',
+    minHeight: '88px',
+    background: '#171717',
+    padding: '0 38px',
   },
 
   // Contenedor de las tres pestanas. Modifica 176px para agrandarlas o achicarlas.
   // Si quieres que las pestanas ocupen mas espacio horizontal, cambia repeat(3, 176px).
   tabs: {
     display: 'grid',
-    gridTemplateColumns: 'repeat(3, 176px)',
+    gridTemplateColumns: '170px 170px',
+    alignItems: 'center',
+    gap: '24px',
     background: 'transparent',
     borderRadius: 0,
     padding: 0,
@@ -848,21 +869,45 @@ const styles = {
   // Estilo base para cada pestana.
   // borderRight dibuja las lineas verticales entre PTE. ENVIO, PTE. ENTREGA y ENTREGADOS.
   tab: {
-    height: '74px',
+    display: 'inline-flex',
+    alignItems: 'center',
+    gap: '14px',
+    height: '42px',
     border: 0,
-    borderRight: '1px solid #242424',
     borderRadius: 0,
     background: 'transparent',
     color: '#ffffff',
-    cursor: 'default',
-    fontSize: '16px',
+    cursor: 'pointer',
+    fontSize: '20px',
     fontWeight: 400,
+    padding: 0,
   },
 
   // Pestana activa. Por ahora representa la vista PTE. ENVIO.
   tabActive: {
-    background: '#d9d9d9',
-    color: '#1f1f1f',
+    background: 'transparent',
+    color: '#ffffff',
+  },
+
+  tabIcon: {
+    display: 'inline-grid',
+    placeItems: 'center',
+    width: '34px',
+    height: '34px',
+    background: '#143b08',
+    color: '#C0FF01',
+  },
+
+  addButton: {
+    alignSelf: 'center',
+    display: 'inline-grid',
+    placeItems: 'center',
+    width: '36px',
+    height: '36px',
+    border: 0,
+    background: '#143b08',
+    color: '#C0FF01',
+    cursor: 'pointer',
   },
 
   // Texto "PRIORIDAD ->" y zona clickeable del filtro.
@@ -982,10 +1027,15 @@ const styles = {
   // Grilla de tarjetas. Cambia columnas/gap/padding para mover las tarjetas dentro del panel.
   orderGrid: {
     display: 'grid',
-    gridTemplateColumns: 'repeat(3, minmax(220px, 300px))',
+    gridTemplateColumns: 'repeat(3, 200px)',
     alignItems: 'start',
-    gap: '18px 28px',
-    padding: '28px 58px 0',
+    gap: '22px',
+    minHeight: '714px',
+    padding: '40px 50px 0',
+    backgroundColor: '#000000',
+    backgroundImage:
+      'linear-gradient(rgba(255,255,255,0.08) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.08) 1px, transparent 1px)',
+    backgroundSize: '90px 90px',
   },
 
   // Tarjeta individual de pedido.
@@ -993,26 +1043,28 @@ const styles = {
   orderCard: {
     position: 'relative' as const,
     display: 'grid',
-    gridTemplateColumns: 'minmax(0, 1fr) 56px',
-    minHeight: '116px',
+    gridTemplateRows: '1fr 46px',
+    width: '200px',
+    minHeight: '178px',
     padding: 0,
     overflow: 'hidden',
     background: '#242424',
     color: '#ffffff',
-    border: '1px solid transparent',
-    borderRadius: '15px',
+    border: '1px solid #454545',
+    borderRadius: 0,
     textAlign: 'left' as const,
     cursor: 'pointer',
   },
 
   // Borde blanco cuando la tarjeta esta seleccionada.
   orderCardActive: {
-    borderColor: '#ffffff',
+    borderColor: '#5d5d5d',
   },
 
   // Padding interno del contenido textual de la tarjeta.
   orderContent: {
-    padding: '16px 15px',
+    position: 'relative' as const,
+    padding: '18px 16px 12px',
   },
 
   // Numero de orden dentro de la tarjeta.
@@ -1020,14 +1072,14 @@ const styles = {
     display: 'block',
     fontSize: '12px',
     fontWeight: 400,
-    marginBottom: '7px',
+    marginBottom: '13px',
   },
 
   // Nombre del cliente dentro de la tarjeta.
   customerName: {
     display: 'block',
     fontSize: '13px',
-    marginBottom: '7px',
+    marginBottom: '10px',
   },
 
   // Fecha de la tarjeta. El color cambia segun la prioridad.
@@ -1035,58 +1087,62 @@ const styles = {
     display: 'block',
     fontSize: '13px',
     fontWeight: 400,
-    marginBottom: '7px',
+    marginBottom: '10px',
   },
 
-  // Fila inferior de la tarjeta: total a la izquierda, cantidad a la derecha.
-  orderBottom: {
-    display: 'flex',
-    justifyContent: 'space-between',
-    gap: '12px',
+  orderTotal: {
+    display: 'block',
     fontSize: '12px',
     color: '#ffffff',
+    marginBottom: '8px',
   },
 
-  // Columna lateral donde va el texto vertical PRODUCTO/IMPRIME.
-  orderSide: {
-    display: 'grid',
-    gridTemplateRows: '1fr',
-    borderLeft: '1px solid #ffffff',
-    minWidth: '56px',
-  },
-
-  // Rayita de color de prioridad dentro de la tarjeta.
-  // Mueve top/right si quieres cambiar su ubicacion exacta.
-  priorityBar: {
+  orderQuantity: {
     position: 'absolute' as const,
-    top: '18px',
-    right: '72px',
-    width: '40px',
-    height: '8px',
-    borderRadius: '999px',
+    right: '14px',
+    bottom: '12px',
+    color: '#ffffff',
+    fontSize: '12px',
   },
 
-  // Texto vertical de la columna lateral.
-  orderKind: {
-    alignSelf: 'center',
-    justifySelf: 'center',
-    transform: 'rotate(-90deg)',
-    color: '#ffffff',
-    fontSize: '11px',
-    fontWeight: 600,
-    marginRight: '66px',
-    textTransform: 'uppercase' as const,
-    whiteSpace: 'nowrap' as const,
-    width: '60px',
-    textAlign: 'center' as const,
+  cardStatusIcon: {
+    position: 'absolute' as const,
+    top: '14px',
+    right: '14px',
+    display: 'grid',
+    placeItems: 'center',
+    width: '26px',
+    height: '26px',
+    border: '1px solid currentColor',
+    borderRadius: '999px',
+    zIndex: 2,
+  },
+
+  orderFooter: {
+    display: 'grid',
+    gridTemplateColumns: '1fr 1fr 1fr',
+    borderTop: '1px dashed #666666',
+    color: '#c8c8c8',
+    fontSize: '12px',
+  },
+
+  orderFooterCell: {},
+
+  orderFooterSpan: {},
+
+  // Los span directos del footer usan borders inline desde CSS del navegador via child.
+  orderFooterText: {
+    display: 'grid',
+    placeItems: 'center',
   },
 
   // Panel derecho completo con el detalle del pedido seleccionado.
   detailPanel: {
-    minHeight: 'calc(100vh - 28px)',
+    minHeight: '920px',
     background: '#171717',
     borderRadius: '0px',
-    padding: '26px 16px',
+    padding: '18px',
+    boxSizing: 'border-box' as const,
   },
 
   // Bloque interno de cada seccion del panel derecho: CLIENTE, PEDIDO, PRODUCTO, SEGUIMIENTO.
@@ -1104,18 +1160,25 @@ const styles = {
 
   // Titulos del panel derecho.
   detailTitle: {
-    margin: '0 0 14px',
+    margin: '0 0 12px',
     fontSize: '17px',
     fontWeight: 400,
     lineHeight: 1,
+  },
+
+  detailSectionTitle: {
+    margin: '12px 0 12px',
+    color: '#6f6f6f',
+    fontSize: '14px',
+    fontWeight: 400,
   },
 
   // Badge verde PAID.
   paidBadge: {
     background: '#4f9f2d',
     color: '#ffffff',
-    borderRadius: '8px',
-    padding: '1px 12px',
+    borderRadius: 0,
+    padding: '4px 14px',
     marginBottom: '10px',
     fontSize: '12px',
     fontWeight: 400,
@@ -1125,14 +1188,14 @@ const styles = {
   detailGrid: {
     display: 'grid',
     gridTemplateColumns: '1fr 1fr',
-    gap: '8px',
+    gap: '7px',
   },
 
   // Caja base de cada campo del detalle.
   detailField: {
-    minHeight: '48px',
-    background: '#0B0B0B',
-    borderRadius: '8px',
+    minHeight: '55px',
+    background: '#202020',
+    borderRadius: 0,
     padding: '10px',
     overflow: 'hidden',
   },
@@ -1144,7 +1207,7 @@ const styles = {
 
   // Variante para campos que necesitan mas alto.
   detailFieldTall: {
-    minHeight: '62px',
+    minHeight: '66px',
   },
 
   // Label pequeno dentro de cada campo: Nombre, Rut, Email, etc.
@@ -1191,16 +1254,16 @@ const styles = {
   // Linea divisoria entre secciones del panel derecho.
   divider: {
     border: 0,
-    borderTop: '1px solid #595959',
+    borderTop: '1px solid transparent',
     margin: '22px 0',
   },
 
   // Caja que contiene la lista de productos/imprimes.
   productBox: {
-    background: '#0B0B0B',
-    borderRadius: '8px',
+    background: '#202020',
+    borderRadius: 0,
     padding: '13px',
-    minHeight: '84px',
+    minHeight: '112px',
   },
 
   // Fila individual de producto: nombre a la izquierda, cantidad a la derecha.
@@ -1217,11 +1280,13 @@ const styles = {
 
   // Input visual del numero de seguimiento. Todavia no guarda en backend.
   trackingInput: {
-    width: '100%',
-    height: '38px',
+    width: '1px',
+    minWidth: 0,
+    flex: 1,
+    height: '36px',
     border: 0,
-    borderRadius: '8px',
-    background: '#0B0B0B',
+    borderRadius: 0,
+    background: '#202020',
     color: '#ffffff',
     padding: '0 11px',
     fontSize: '11px',
@@ -1231,15 +1296,21 @@ const styles = {
 
   // Boton COMPLETAR de la seccion seguimiento. Por ahora solo visual.
   completeButton: {
-    display: 'block',
-    margin: '12px auto 0',
-    height: '32px',
-    padding: '0 16px',
-    border: '1px solid #ffffff',
-    borderRadius: '9px',
-    background: 'transparent',
-    color: '#ffffff',
-    fontSize: '10px',
+    width: '88px',
+    height: '36px',
+    padding: 0,
+    border: 0,
+    borderRadius: 0,
+    background: '#bdbdbd',
+    color: '#C0FF01',
+    fontSize: '12px',
+    fontWeight: 700,
+  },
+
+  trackingRow: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '64px',
   },
 
   // Estado vacio/cargando dentro del panel de ventas.
