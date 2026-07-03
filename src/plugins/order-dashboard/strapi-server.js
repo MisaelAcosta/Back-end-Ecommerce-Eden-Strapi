@@ -164,7 +164,19 @@ const getPreviousMonth = (year, month) => {
   return { year, month: month - 1 };
 };
 
+const DEFAULT_MONTHLY_GOAL = 645000;
+
+const findMonthlyGoal = async (year, month) =>
+  strapi.db.query('api::monthly-goal.monthly-goal').findOne({
+    where: {
+      year,
+      month,
+    },
+  });
+
 const getOrderDate = (order) => new Date(order.paidAt || order.createdAt || order.updatedAt || 0);
+
+const getOrderLabel = (order) => order.orderNumber || order.commerceOrder || order.orderName || 'Sin numero';
 
 const formatDateKey = (date) => date.toISOString().slice(0, 10);
 
@@ -173,7 +185,7 @@ const getItemName = (item) =>
 
 const getItemVariantDocumentId = (item) => item.variant?.documentId || null;
 
-const buildMonthMetrics = (orders, bodegaRows) => {
+const buildMonthMetrics = (orders, bodegaRows, period = null) => {
   const bodegaByVariantDocumentId = new Map(bodegaRows.map((bodega) => [bodega.variantDocumentId, bodega]));
   const productsByName = new Map();
   const clientsByEmail = new Map();
@@ -193,6 +205,7 @@ const buildMonthMetrics = (orders, bodegaRows) => {
       products: 0,
       totalPaid: 0,
       orders: 0,
+      orderSummaries: [],
     };
     const currentDate = datesByKey.get(dateKey) || {
       date: dateKey,
@@ -204,6 +217,12 @@ const buildMonthMetrics = (orders, bodegaRows) => {
     revenue += orderTotal;
     currentClient.totalPaid += orderTotal;
     currentClient.orders += 1;
+    currentClient.orderSummaries.push({
+      orderNumber: getOrderLabel(order),
+      date: formatDateKey(orderDate),
+      total: orderTotal,
+      products: [],
+    });
     currentDate.revenue += orderTotal;
     currentDate.orders += 1;
 
@@ -224,6 +243,11 @@ const buildMonthMetrics = (orders, bodegaRows) => {
       soldProducts += qty;
       expenses += unitCost * qty;
       currentClient.products += qty;
+      currentClient.orderSummaries[currentClient.orderSummaries.length - 1].products.push({
+        name,
+        qty,
+        total: lineTotal,
+      });
       currentDate.products += qty;
       currentProduct.quantity += qty;
       currentProduct.revenue += lineTotal;
@@ -244,7 +268,21 @@ const buildMonthMetrics = (orders, bodegaRows) => {
   const importantDates = Array.from(datesByKey.values())
     .sort((a, b) => b.products - a.products || b.revenue - a.revenue)
     .slice(0, 5);
-  const dailyRevenue = Array.from(datesByKey.values()).sort((a, b) => a.date.localeCompare(b.date));
+  const dailyRevenue = period
+    ? Array.from({ length: new Date(Date.UTC(period.year, period.month, 0)).getUTCDate() }, (_, index) => {
+        const date = new Date(Date.UTC(period.year, period.month - 1, index + 1));
+        const key = formatDateKey(date);
+
+        return (
+          datesByKey.get(key) || {
+            date: key,
+            products: 0,
+            revenue: 0,
+            orders: 0,
+          }
+        );
+      })
+    : Array.from(datesByKey.values()).sort((a, b) => a.date.localeCompare(b.date));
 
   return {
     revenue,
@@ -541,8 +579,10 @@ module.exports = () => ({
         });
         const currentOrders = uniqueOrdersByDocumentId(orders);
         const uniquePreviousOrders = uniqueOrdersByDocumentId(previousOrders);
-        const current = buildMonthMetrics(currentOrders, bodegaRows);
-        const previous = buildMonthMetrics(uniquePreviousOrders, bodegaRows);
+        const current = buildMonthMetrics(currentOrders, bodegaRows, requestedMonth);
+        const previous = buildMonthMetrics(uniquePreviousOrders, bodegaRows, previousBounds);
+        const monthlyGoal = await findMonthlyGoal(requestedMonth.year, requestedMonth.month);
+        const goalAmount = Number(monthlyGoal?.amount || DEFAULT_MONTHLY_GOAL);
         const revenueDiffPercent =
           previous.revenue > 0 ? ((current.revenue - previous.revenue) / previous.revenue) * 100 : 0;
 
@@ -557,14 +597,55 @@ module.exports = () => ({
               month: previousBounds.month,
             },
             goal: {
-              amount: 645000,
-              progressPercent: 645000 > 0 ? Math.min((current.revenue / 645000) * 100, 100) : 0,
+              id: monthlyGoal?.id,
+              documentId: monthlyGoal?.documentId,
+              amount: goalAmount,
+              progressPercent: goalAmount > 0 ? Math.min((current.revenue / goalAmount) * 100, 100) : 0,
             },
             current,
             previous,
             comparison: {
               revenueDiffPercent,
             },
+          },
+        };
+      },
+      async saveGoal(ctx) {
+        const year = Number(ctx.request.body?.year);
+        const month = Number(ctx.request.body?.month);
+        const amount = toInteger(ctx.request.body?.amount);
+
+        if (!year || !month || month < 1 || month > 12) {
+          return ctx.badRequest('Debes ingresar un mes y anio validos.');
+        }
+
+        if (amount <= 0) {
+          return ctx.badRequest('La meta debe ser mayor a cero.');
+        }
+
+        const data = {
+          goalName: `Meta ${String(month).padStart(2, '0')}-${year}`,
+          year,
+          month,
+          amount,
+        };
+        const existingGoal = await findMonthlyGoal(year, month);
+        const savedGoal = existingGoal
+          ? await strapi.db.query('api::monthly-goal.monthly-goal').update({
+              where: { id: existingGoal.id },
+              data,
+            })
+          : await strapi.db.query('api::monthly-goal.monthly-goal').create({
+              data,
+            });
+
+        ctx.body = {
+          data: {
+            id: savedGoal.id,
+            documentId: savedGoal.documentId,
+            year: savedGoal.year,
+            month: savedGoal.month,
+            amount: Number(savedGoal.amount || 0),
           },
         };
       },
@@ -618,6 +699,14 @@ module.exports = () => ({
           method: 'GET',
           path: '/metrics',
           handler: 'metrics.findSummary',
+          config: {
+            policies: ['admin::isAuthenticatedAdmin'],
+          },
+        },
+        {
+          method: 'POST',
+          path: '/metrics/goals',
+          handler: 'metrics.saveGoal',
           config: {
             policies: ['admin::isAuthenticatedAdmin'],
           },

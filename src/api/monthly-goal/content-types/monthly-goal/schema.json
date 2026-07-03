@@ -1,0 +1,31 @@
+{
+  "kind": "collectionType",
+  "collectionName": "monthly_goals",
+  "info": {
+    "singularName": "monthly-goal",
+    "pluralName": "monthly-goals",
+    "displayName": "Meta mensual",
+    "description": "Metas de venta mensuales para el panel de metricas"
+  },
+  "options": {
+    "draftAndPublish": false
+  },
+  "pluginOptions": {},
+  "attributes": {
+    "goalName": {
+      "type": "string"
+    },
+    "year": {
+      "type": "integer",
+      "required": true
+    },
+    "month": {
+      "type": "integer",
+      "required": true
+    },
+    "amount": {
+      "type": "integer",
+      "required": true
+    }
+  }
+}

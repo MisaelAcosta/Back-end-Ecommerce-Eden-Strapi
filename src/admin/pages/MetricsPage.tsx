@@ -15,6 +15,16 @@ type ClientMetric = {
   products: number;
   totalPaid: number;
   orders: number;
+  orderSummaries?: Array<{
+    orderNumber: string;
+    date: string;
+    total: number;
+    products: Array<{
+      name: string;
+      qty: number;
+      total: number;
+    }>;
+  }>;
 };
 
 type DateMetric = {
@@ -48,6 +58,8 @@ type MetricsResponse = {
       month: number;
     };
     goal: {
+      id?: number;
+      documentId?: string;
       amount: number;
       progressPercent: number;
     };
@@ -56,6 +68,16 @@ type MetricsResponse = {
     comparison: {
       revenueDiffPercent: number;
     };
+  };
+};
+
+type SaveGoalResponse = {
+  data: {
+    id: number;
+    documentId?: string;
+    year: number;
+    month: number;
+    amount: number;
   };
 };
 
@@ -81,6 +103,11 @@ const moneyFormatter = new Intl.NumberFormat('es-CL', {
 const formatMoney = (value: number) => `$ ${moneyFormatter.format(Math.round(value || 0))}`;
 const formatNumber = (value: number) => moneyFormatter.format(Math.round(value || 0));
 const getMonthName = (month: number) => monthNames[Math.max(Math.min(month - 1, 11), 0)];
+const parseMoneyInput = (value: string) => {
+  const parsed = Number(value.replace(/\./g, '').replace(',', '.').trim());
+
+  return Number.isFinite(parsed) ? Math.round(parsed) : 0;
+};
 const getEmptyMetrics = (): MonthMetrics => ({
   revenue: 0,
   expenses: 0,
@@ -95,17 +122,29 @@ const getEmptyMetrics = (): MonthMetrics => ({
 });
 
 const MetricsPage = () => {
-  const { get } = useFetchClient();
+  const { get, post } = useFetchClient();
   const today = useMemo(() => new Date(), []);
   const [selectedMonth, setSelectedMonth] = useState(today.getMonth() + 1);
   const [selectedYear] = useState(today.getFullYear());
   const [metrics, setMetrics] = useState<MetricsResponse['data'] | null>(null);
+  const [isGoalEditorOpen, setIsGoalEditorOpen] = useState(false);
+  const [goalDraftMonth, setGoalDraftMonth] = useState(selectedMonth);
+  const [goalDraftYear, setGoalDraftYear] = useState(selectedYear);
+  const [goalDraftAmount, setGoalDraftAmount] = useState('');
+  const [isSavingGoal, setIsSavingGoal] = useState(false);
+  const [selectedClientEmail, setSelectedClientEmail] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const selectedMonthName = getMonthName(selectedMonth);
   const monthOptions = Array.from({ length: 12 }, (_, index) => index + 1);
   const current = metrics?.current || getEmptyMetrics();
   const previous = metrics?.previous || getEmptyMetrics();
+
+  useEffect(() => {
+    setGoalDraftMonth(selectedMonth);
+    setGoalDraftYear(selectedYear);
+    setGoalDraftAmount(metrics?.goal.amount ? formatNumber(metrics.goal.amount) : '');
+  }, [metrics?.goal.amount, selectedMonth, selectedYear]);
 
   useEffect(() => {
     let isMounted = true;
@@ -143,6 +182,46 @@ const MetricsPage = () => {
     };
   }, [get, selectedMonth, selectedYear]);
 
+  const saveMonthlyGoal = async () => {
+    const amount = parseMoneyInput(goalDraftAmount);
+
+    setIsSavingGoal(true);
+    setError(null);
+
+    try {
+      const response = await post<SaveGoalResponse>('/order-dashboard/metrics/goals', {
+        year: goalDraftYear,
+        month: goalDraftMonth,
+        amount,
+      });
+      const savedGoal = response.data.data;
+
+      if (savedGoal.year === selectedYear && savedGoal.month === selectedMonth) {
+        setMetrics((currentMetrics) =>
+          currentMetrics
+            ? {
+                ...currentMetrics,
+                goal: {
+                  ...currentMetrics.goal,
+                  id: savedGoal.id,
+                  documentId: savedGoal.documentId,
+                  amount: savedGoal.amount,
+                  progressPercent:
+                    savedGoal.amount > 0 ? Math.min((currentMetrics.current.revenue / savedGoal.amount) * 100, 100) : 0,
+                },
+              }
+            : currentMetrics
+        );
+      }
+
+      setIsGoalEditorOpen(false);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'No se pudo guardar la meta mensual.');
+    } finally {
+      setIsSavingGoal(false);
+    }
+  };
+
   return (
     <main style={styles.page} aria-label="Metricas">
       {error ? <div style={{ color: '#ff6b5f', margin: '0 auto 14px', maxWidth: '1500px' }}>{error}</div> : null}
@@ -157,13 +236,30 @@ const MetricsPage = () => {
         <MonthlyGoalBlock
           current={current}
           goalAmount={metrics?.goal.amount || 645000}
+          goalDraftAmount={goalDraftAmount}
+          goalDraftMonth={goalDraftMonth}
+          goalDraftYear={goalDraftYear}
           isLoading={isLoading}
+          isSavingGoal={isSavingGoal}
+          isEditorOpen={isGoalEditorOpen}
           monthName={selectedMonthName}
+          onChangeGoalAmount={setGoalDraftAmount}
+          onChangeGoalMonth={setGoalDraftMonth}
+          onChangeGoalYear={setGoalDraftYear}
+          onCloseEditor={() => setIsGoalEditorOpen(false)}
+          onOpenEditor={() => setIsGoalEditorOpen(true)}
+          onSaveGoal={saveMonthlyGoal}
           progressPercent={metrics?.goal.progressPercent || 0}
           selectedDay={today.getDate()}
           selectedYear={selectedYear}
         />
-        <ClientsBlock clients={current.topClients} isLoading={isLoading} monthName={selectedMonthName} />
+        <ClientsBlock
+          clients={current.topClients}
+          isLoading={isLoading}
+          monthName={selectedMonthName}
+          selectedClientEmail={selectedClientEmail}
+          onSelectClient={setSelectedClientEmail}
+        />
         <ProductsBlock isLoading={isLoading} monthName={selectedMonthName} products={current.topProducts} />
         <EvolutionAndComparisonBlock
           comparisonPercent={metrics?.comparison.revenueDiffPercent || 0}
@@ -173,7 +269,12 @@ const MetricsPage = () => {
           previous={previous}
           previousMonthName={metrics ? getMonthName(metrics.previousPeriod.month) : getMonthName(selectedMonth - 1 || 12)}
         />
-        <ImportantDatesBlock dates={current.importantDates} isLoading={isLoading} monthName={selectedMonthName} />
+        <ImportantDatesBlock
+          dailyDates={current.dailyRevenue}
+          importantDates={current.importantDates}
+          isLoading={isLoading}
+          monthName={selectedMonthName}
+        />
       </section>
     </main>
   );
@@ -238,16 +339,38 @@ const DateFilterBlock = ({
 const MonthlyGoalBlock = ({
   current,
   goalAmount,
+  goalDraftAmount,
+  goalDraftMonth,
+  goalDraftYear,
   isLoading,
+  isSavingGoal,
+  isEditorOpen,
   monthName,
+  onChangeGoalAmount,
+  onChangeGoalMonth,
+  onChangeGoalYear,
+  onCloseEditor,
+  onOpenEditor,
+  onSaveGoal,
   progressPercent,
   selectedDay,
   selectedYear,
 }: {
   current: MonthMetrics;
   goalAmount: number;
+  goalDraftAmount: string;
+  goalDraftMonth: number;
+  goalDraftYear: number;
   isLoading: boolean;
+  isSavingGoal: boolean;
+  isEditorOpen: boolean;
   monthName: string;
+  onChangeGoalAmount: (value: string) => void;
+  onChangeGoalMonth: (value: number) => void;
+  onChangeGoalYear: (value: number) => void;
+  onCloseEditor: () => void;
+  onOpenEditor: () => void;
+  onSaveGoal: () => void;
   progressPercent: number;
   selectedDay: number;
   selectedYear: number;
@@ -277,54 +400,161 @@ const MonthlyGoalBlock = ({
     <div style={styles.goalRight}>
       <div style={styles.blockHeader}>
         <span style={styles.tinyLabel}>Ingreso actual</span>
-        <span style={{ color: '#ffffff', fontSize: '18px' }}>+</span>
+        <button type="button" onClick={isEditorOpen ? onCloseEditor : onOpenEditor} style={styles.goalAddButton}>
+          {isEditorOpen ? 'x' : '+'}
+        </button>
       </div>
-      <div>
-        <div style={styles.metricValue}>{isLoading ? '$ ...' : formatMoney(current.revenue)}</div>
-        <div style={{ ...styles.tinyLabel, margin: '14px 0 5px' }}>
-          {formatNumber(current.revenue)} / {formatNumber(goalAmount)}
+      {isEditorOpen ? (
+        <div style={styles.goalEditor}>
+          <div style={styles.goalEditorRow}>
+            <label style={styles.goalEditorLabel}>
+              Mes
+              <select
+                onChange={(event) => onChangeGoalMonth(Number(event.target.value))}
+                style={styles.goalEditorInput}
+                value={goalDraftMonth}
+              >
+                {monthNames.map((name, index) => (
+                  <option key={name} value={index + 1}>
+                    {String(index + 1).padStart(2, '0')} - {name}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label style={styles.goalEditorLabel}>
+              Anio
+              <input
+                inputMode="numeric"
+                onChange={(event) => onChangeGoalYear(Number(event.target.value) || selectedYear)}
+                style={styles.goalEditorInput}
+                value={goalDraftYear}
+              />
+            </label>
+          </div>
+          <label style={styles.goalEditorLabel}>
+            Meta del mes
+            <input
+              inputMode="numeric"
+              onChange={(event) => onChangeGoalAmount(event.target.value)}
+              placeholder="Ej: 645.000"
+              style={styles.goalEditorInput}
+              value={goalDraftAmount}
+            />
+          </label>
+          <button type="button" disabled={isSavingGoal} onClick={onSaveGoal} style={styles.goalSaveButton}>
+            {isSavingGoal ? 'Guardando' : 'Guardar meta'}
+          </button>
         </div>
-        <div style={styles.progressTrack}>
-          <div style={{ ...styles.progressFill, width: `${Math.min(progressPercent, 100)}%` }} />
-        </div>
-      </div>
-      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px' }}>
-        <strong>Productos Vendidos</strong>
-        <span>{isLoading ? '...' : current.soldProducts}</span>
-      </div>
+      ) : (
+        <>
+          <div>
+            <div style={styles.metricValue}>{isLoading ? '$ ...' : formatMoney(current.revenue)}</div>
+            <div style={{ ...styles.tinyLabel, margin: '14px 0 5px' }}>
+              {formatNumber(current.revenue)} / {formatNumber(goalAmount)}
+            </div>
+            <div style={styles.progressTrack}>
+              <div style={{ ...styles.progressFill, width: `${Math.min(progressPercent, 100)}%` }} />
+            </div>
+          </div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px' }}>
+            <strong>Productos Vendidos</strong>
+            <span>{isLoading ? '...' : current.soldProducts}</span>
+          </div>
+        </>
+      )}
     </div>
   </section>
 );
 
-const ClientsBlock = ({ clients, isLoading, monthName }: { clients: ClientMetric[]; isLoading: boolean; monthName: string }) => (
-  <section style={styles.clientsBlock} aria-label="Clientes">
-    <div style={styles.blockHeader}>
-      <h2 style={styles.mutedTitle}>Clientes</h2>
-      <span style={{ color: '#ffffff', textTransform: 'capitalize' }}>{monthName}</span>
+const ClientsBlock = ({
+  clients,
+  isLoading,
+  monthName,
+  onSelectClient,
+  selectedClientEmail,
+}: {
+  clients: ClientMetric[];
+  isLoading: boolean;
+  monthName: string;
+  onSelectClient: (email: string | null) => void;
+  selectedClientEmail: string | null;
+}) => {
+  const selectedClient = clients.find((client) => client.email === selectedClientEmail) || null;
+
+  return (
+    <section style={styles.clientsBlock} aria-label="Clientes">
+      <div style={styles.blockHeader}>
+        <h2 style={styles.mutedTitle}>Clientes</h2>
+        <span style={{ color: '#ffffff', textTransform: 'capitalize' }}>{monthName}</span>
+      </div>
+      <p style={{ margin: '24px 0 0', color: '#ffffff', fontSize: '18px', lineHeight: 1.1 }}>
+        Top <span style={{ color: '#C0FF01' }}>↗</span>
+        <br />
+        Clientes
+      </p>
+      <div style={styles.clientRows}>
+        {isLoading ? (
+          <EmptyState text="Cargando clientes..." />
+        ) : clients.length === 0 ? (
+          <EmptyState text="No hay clientes con compras pagadas en este mes." />
+        ) : (
+          clients.map((client, index) => {
+            const isActive = selectedClientEmail ? client.email === selectedClientEmail : index === 0;
+
+            return (
+              <div key={client.email} style={{ ...styles.clientRow, ...(isActive ? styles.activeClientRow : {}) }}>
+                <span>{String(index + 1).padStart(2, '0')}</span>
+                <span style={styles.clientEmail} title={client.email}>
+                  {client.email}
+                </span>
+                <span>{client.products}</span>
+                <span>{formatNumber(client.totalPaid)}</span>
+                <button
+                  type="button"
+                  onClick={() => onSelectClient(client.email === selectedClientEmail ? null : client.email)}
+                  style={{ ...styles.clientInfoButton, ...(isActive ? styles.clientInfoButtonActive : {}) }}
+                >
+                  {client.orders} pedidos
+                </button>
+              </div>
+            );
+          })
+        )}
+      </div>
+      {selectedClient ? <ClientSummary client={selectedClient} /> : null}
+    </section>
+  );
+};
+
+const ClientSummary = ({ client }: { client: ClientMetric }) => (
+  <div style={styles.clientSummary}>
+    <div style={styles.clientSummaryHeader}>
+      <span style={styles.clientSummaryEmail} title={client.email}>
+        {client.email}
+      </span>
+      <strong>{formatMoney(client.totalPaid)}</strong>
     </div>
-    <p style={{ margin: '24px 0 0', color: '#ffffff', fontSize: '18px', lineHeight: 1.1 }}>
-      Top <span style={{ color: '#C0FF01' }}>↗</span>
-      <br />
-      Clientes
-    </p>
-    <div style={styles.clientRows}>
-      {isLoading ? (
-        <EmptyState text="Cargando clientes..." />
-      ) : clients.length === 0 ? (
-        <EmptyState text="No hay clientes con compras pagadas en este mes." />
-      ) : (
-        clients.map((client, index) => (
-          <div key={client.email} style={{ ...styles.clientRow, ...(index === 0 ? styles.activeClientRow : {}) }}>
-            <span>{String(index + 1).padStart(2, '0')}</span>
-            <span>{client.email}</span>
-            <span>{client.products}</span>
-            <span>{formatNumber(client.totalPaid)}</span>
-            <span>{client.orders} pedidos</span>
+    <div style={styles.clientSummaryBody}>
+      {(client.orderSummaries || []).map((order) => (
+        <div key={`${order.orderNumber}-${order.date}`} style={styles.clientOrderCard}>
+          <div style={styles.clientOrderHeader}>
+            <span>{order.orderNumber}</span>
+            <span>{order.date}</span>
+            <strong>{formatMoney(order.total)}</strong>
           </div>
-        ))
-      )}
+          <div style={styles.clientProductList}>
+            {order.products.map((product) => (
+              <div key={`${order.orderNumber}-${product.name}`} style={styles.clientProductLine}>
+                <span>{product.name}</span>
+                <span>x{product.qty}</span>
+                <span>{formatMoney(product.total)}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      ))}
     </div>
-  </section>
+  </div>
 );
 
 const ProductsBlock = ({ isLoading, monthName, products }: { isLoading: boolean; monthName: string; products: ProductMetric[] }) => {
@@ -384,57 +614,71 @@ const EvolutionAndComparisonBlock = ({
   monthName: string;
   previous: MonthMetrics;
   previousMonthName: string;
-}) => (
-  <section style={styles.bottomBand} aria-label="Evolucion y comparativa">
-    <div style={styles.evolutionPanel}>
-      <div style={styles.blockHeader}>
-        <h2 style={styles.mutedTitle}>Evolucion de ventas</h2>
-        <span style={{ textTransform: 'capitalize' }}>{monthName}</span>
-      </div>
-      <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '8px' }}>
-        <div>
-          <div style={{ fontSize: '18px' }}>Ingreso total</div>
-          <strong style={{ color: '#C0FF01', fontSize: '20px' }}>{isLoading ? '$ ...' : formatMoney(current.revenue)}</strong>
+}) => {
+  const hasPreviousRevenue = previous.revenue > 0;
+  const comparisonText = hasPreviousRevenue ? `${comparisonPercent.toFixed(1)}%` : 'Sin ventas el mes anterior';
+
+  return (
+    <section style={styles.bottomBand} aria-label="Evolucion y comparativa">
+      <div style={styles.evolutionPanel}>
+        <div style={styles.blockHeader}>
+          <h2 style={styles.mutedTitle}>Evolucion de ventas</h2>
+          <span style={{ textTransform: 'capitalize' }}>{monthName}</span>
         </div>
-        <div style={{ display: 'flex', gap: '18px', fontSize: '16px' }}>
-          <span>Ingreso</span>
-          <span style={{ color: '#686868' }}>Perdida</span>
+        <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '8px' }}>
+          <div>
+            <div style={{ fontSize: '18px' }}>Ingreso total</div>
+            <strong style={{ color: '#C0FF01', fontSize: '20px' }}>{isLoading ? '$ ...' : formatMoney(current.revenue)}</strong>
+          </div>
+          <div style={{ display: 'flex', gap: '18px', fontSize: '16px' }}>
+            <span>Ingreso</span>
+            <span style={{ color: '#686868' }}>Perdida</span>
+          </div>
         </div>
-      </div>
-      <div style={styles.chartFrame}>
-        {isLoading ? <EmptyState text="Cargando evolucion..." /> : <RevenueLineChart points={current.dailyRevenue} />}
-      </div>
-    </div>
-    <div style={styles.comparativePanel}>
-      <div style={styles.blockHeader}>
-        <h2 style={styles.mutedTitle}>Comparativa</h2>
-        <span style={{ textTransform: 'capitalize' }}>
-          {previousMonthName} x {monthName}
-        </span>
-      </div>
-      <p style={{ margin: '8px 0 28px', fontSize: '18px' }}>
-        <strong style={{ color: '#C0FF01' }}>{comparisonPercent.toFixed(1)}%</strong> respecto al
-        <br />
-        mes anterior
-      </p>
-      <div style={styles.progressTrack}>
-        <div style={{ ...styles.progressFill, width: `${Math.min(Math.abs(comparisonPercent), 100)}%` }} />
-      </div>
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '32px', marginTop: '10px', color: '#a8a8a8', fontSize: '13px' }}>
-        <MetricList metrics={current} />
-        <MetricList metrics={previous} />
-      </div>
-      <div style={{ display: 'grid', gridTemplateColumns: '92px 1fr', marginTop: '58px', minHeight: '76px', background: '#0b3a1e' }}>
-        <div style={{ display: 'grid', placeItems: 'center', background: '#C0FF01', color: '#111111', textTransform: 'capitalize' }}>
-          {monthName}
-        </div>
-        <div style={{ display: 'grid', alignItems: 'end', justifyItems: 'end', padding: '10px', color: '#cfcfcf', textTransform: 'capitalize' }}>
-          {previousMonthName}
+        <div style={styles.chartFrame}>
+          {isLoading ? <EmptyState text="Cargando evolucion..." /> : <RevenueLineChart points={current.dailyRevenue} />}
         </div>
       </div>
-    </div>
-  </section>
-);
+      <div style={styles.comparativePanel}>
+        <div style={styles.blockHeader}>
+          <h2 style={styles.mutedTitle}>Comparativa</h2>
+          <span style={{ textTransform: 'capitalize' }}>
+            {previousMonthName} x {monthName}
+          </span>
+        </div>
+        <p style={{ margin: '8px 0 28px', fontSize: '18px' }}>
+          <strong style={{ color: '#C0FF01' }}>{hasPreviousRevenue ? `↗ ${comparisonText}` : comparisonText}</strong>
+          {hasPreviousRevenue ? (
+            <>
+              {' '}respecto al
+              <br />
+              mes anterior
+            </>
+          ) : (
+            <>
+              <br />
+              comparativa no disponible
+            </>
+          )}
+        </p>
+        <div style={styles.comparisonTopLine}>
+          <span style={styles.comparisonTopCurrent} />
+          <span style={styles.comparisonTopPrevious} />
+        </div>
+        <div style={styles.comparisonMetricsGrid}>
+          <MetricList metrics={current} />
+          <MetricList metrics={previous} />
+        </div>
+        <ComparisonRevenueBar
+          currentLabel={monthName}
+          currentRevenue={current.revenue}
+          previousLabel={previousMonthName}
+          previousRevenue={previous.revenue}
+        />
+      </div>
+    </section>
+  );
+};
 
 const RevenueLineChart = ({ points }: { points: DateMetric[] }) => {
   if (points.length === 0) {
@@ -442,32 +686,82 @@ const RevenueLineChart = ({ points }: { points: DateMetric[] }) => {
   }
 
   const maxRevenue = Math.max(...points.map((point) => point.revenue), 1);
-  const width = 470;
-  const height = 250;
+  const yMax = Math.max(Math.ceil(maxRevenue / 10000) * 10000, 100000);
+  const width = 540;
+  const height = 280;
+  const padding = {
+    top: 12,
+    right: 12,
+    bottom: 34,
+    left: 64,
+  };
+  const plotWidth = width - padding.left - padding.right;
+  const plotHeight = height - padding.top - padding.bottom;
   const coordinates = points.map((point, index) => {
-    const x = points.length === 1 ? width / 2 : (index / (points.length - 1)) * width;
-    const y = height - 28 - (point.revenue / maxRevenue) * 170;
+    const x = padding.left + (points.length === 1 ? plotWidth / 2 : (index / (points.length - 1)) * plotWidth);
+    const y = padding.top + (1 - point.revenue / yMax) * plotHeight;
 
     return { x, y, point };
   });
-  const linePath = coordinates.map((coordinate, index) => `${index === 0 ? 'M' : 'L'}${coordinate.x} ${coordinate.y}`).join(' ');
-  const areaPath = `${linePath} L${coordinates[coordinates.length - 1].x} ${height} L${coordinates[0].x} ${height} Z`;
+  const linePath = buildSmoothPath(coordinates);
+  const areaPath = `${linePath} L${coordinates[coordinates.length - 1].x} ${height - padding.bottom} L${coordinates[0].x} ${height - padding.bottom} Z`;
+  const yLabels = Array.from({ length: 10 }, (_, index) => yMax - index * (yMax / 10)).filter((value) => value > 0);
+  const salesCoordinates = coordinates.filter(({ point }) => point.revenue > 0);
+  const labelCoordinates = [
+    coordinates[0],
+    ...salesCoordinates,
+    coordinates[coordinates.length - 1],
+  ].filter((coordinate, index, list) => list.findIndex((item) => item.point.date === coordinate.point.date) === index);
 
   return (
-    <svg aria-hidden="true" width="100%" height="250" viewBox={`0 0 ${width} ${height}`} preserveAspectRatio="none">
+    <svg aria-hidden="true" width="100%" height="280" viewBox={`0 0 ${width} ${height}`} preserveAspectRatio="none">
       <defs>
         <linearGradient id="incomeArea" x1="0" x2="0" y1="0" y2="1">
           <stop offset="0%" stopColor="#C0FF01" stopOpacity="0.35" />
           <stop offset="100%" stopColor="#C0FF01" stopOpacity="0" />
         </linearGradient>
       </defs>
+      {yLabels.map((value) => {
+        const y = padding.top + (1 - value / yMax) * plotHeight;
+
+        return (
+          <text key={value} x="0" y={y + 5} fill="#d6d6d6" fontSize="16">
+            ${Math.round(value / 1000)}k
+          </text>
+        );
+      })}
       <path d={areaPath} fill="url(#incomeArea)" />
       <path d={linePath} fill="none" stroke="#C0FF01" strokeWidth="2" />
-      {coordinates.map(({ point, x, y }) => (
-        <circle key={point.date} cx={x} cy={y} r="4" fill="#C0FF01" />
+      {salesCoordinates.map(({ point, x, y }) => (
+        <g key={point.date}>
+          <line x1={x} x2={x} y1={y + 8} y2={height - padding.bottom} stroke="#8b8b8b" strokeDasharray="2 3" />
+          <circle cx={x} cy={y} r="5" fill="#C0FF01" />
+        </g>
+      ))}
+      {labelCoordinates.map(({ point, x }) => (
+        <text key={`label-${point.date}`} x={x} y={height - 8} fill="#d6d6d6" fontSize="15" textAnchor="middle">
+          {String(new Date(`${point.date}T00:00:00`).getDate()).padStart(2, '0')}
+        </text>
       ))}
     </svg>
   );
+};
+
+const buildSmoothPath = (coordinates: Array<{ x: number; y: number }>) => {
+  if (coordinates.length === 1) {
+    return `M${coordinates[0].x} ${coordinates[0].y}`;
+  }
+
+  return coordinates.reduce((path, point, index, list) => {
+    if (index === 0) {
+      return `M${point.x} ${point.y}`;
+    }
+
+    const previous = list[index - 1];
+    const controlX = (previous.x + point.x) / 2;
+
+    return `${path} C${controlX} ${previous.y}, ${controlX} ${point.y}, ${point.x} ${point.y}`;
+  }, '');
 };
 
 const MetricList = ({ metrics }: { metrics: MonthMetrics }) => (
@@ -487,8 +781,56 @@ const MetricList = ({ metrics }: { metrics: MonthMetrics }) => (
   </div>
 );
 
-const ImportantDatesBlock = ({ dates, isLoading, monthName }: { dates: DateMetric[]; isLoading: boolean; monthName: string }) => {
-  const maxProducts = Math.max(...dates.map((date) => date.products), 1);
+const ComparisonRevenueBar = ({
+  currentLabel,
+  currentRevenue,
+  previousLabel,
+  previousRevenue,
+}: {
+  currentLabel: string;
+  currentRevenue: number;
+  previousLabel: string;
+  previousRevenue: number;
+}) => {
+  const totalRevenue = currentRevenue + previousRevenue;
+  const currentPercent = totalRevenue > 0 ? (currentRevenue / totalRevenue) * 100 : 50;
+  const previousPercent = totalRevenue > 0 ? 100 - currentPercent : 50;
+
+  return (
+    <div style={styles.comparisonRevenueBar}>
+      <div
+        style={{
+          ...styles.comparisonRevenueCurrent,
+          width: `${currentPercent}%`,
+        }}
+      >
+        <span>{currentLabel}</span>
+      </div>
+      <div
+        style={{
+          ...styles.comparisonRevenuePrevious,
+          width: `${previousPercent}%`,
+        }}
+      >
+        <span>{previousLabel}</span>
+      </div>
+    </div>
+  );
+};
+
+const ImportantDatesBlock = ({
+  dailyDates,
+  importantDates,
+  isLoading,
+  monthName,
+}: {
+  dailyDates: DateMetric[];
+  importantDates: DateMetric[];
+  isLoading: boolean;
+  monthName: string;
+}) => {
+  const importantDateKeys = new Set(importantDates.slice(0, 3).map((date) => date.date));
+  const maxProducts = Math.max(...dailyDates.map((date) => date.products), 1);
 
   return (
     <section style={styles.datesBlock} aria-label="Fechas importantes">
@@ -505,10 +847,10 @@ const ImportantDatesBlock = ({ dates, isLoading, monthName }: { dates: DateMetri
         <div style={{ color: '#8fbf9d', fontSize: '13px', textAlign: 'right' }}>
           {isLoading ? (
             <div>Cargando...</div>
-          ) : dates.length === 0 ? (
+          ) : importantDates.length === 0 ? (
             <div>Sin ventas este mes</div>
           ) : (
-            dates.slice(0, 3).map((date) => (
+            importantDates.slice(0, 3).map((date) => (
               <div key={date.date}>
                 {date.date} ---- <span style={{ color: '#C0FF01' }}>{date.products}</span>
               </div>
@@ -517,21 +859,27 @@ const ImportantDatesBlock = ({ dates, isLoading, monthName }: { dates: DateMetri
         </div>
       </div>
       <div style={styles.dateBars}>
-        {isLoading || dates.length === 0 ? (
+        {isLoading || dailyDates.length === 0 ? (
           <EmptyState text={isLoading ? 'Cargando fechas...' : 'No hay fechas importantes aun.'} />
         ) : (
-          dates.map((date) => (
+          dailyDates.map((date) => {
+            const isImportant = importantDateKeys.has(date.date) && date.products > 0;
+
+            return (
             <div key={date.date} style={{ display: 'grid', gap: '6px', justifyItems: 'center' }}>
-              <span style={{ color: '#ffffff', fontSize: '12px' }}>{new Date(`${date.date}T00:00:00`).getDate()}</span>
+              {isImportant ? (
+                <span style={{ color: '#ffffff', fontSize: '12px' }}>{new Date(`${date.date}T00:00:00`).getDate()}</span>
+              ) : null}
               <span
                 style={{
                   ...styles.dateBar,
-                  height: Math.max((date.products / maxProducts) * 132, 42),
-                  background: '#C0FF01',
+                  height: Math.max((date.products / maxProducts) * 150, date.products > 0 ? 58 : 44),
+                  background: isImportant ? '#C0FF01' : '#ffffff',
                 }}
               />
             </div>
-          ))
+          );
+          })
         )}
       </div>
     </section>

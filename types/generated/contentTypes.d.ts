@@ -641,6 +641,38 @@ export interface ApiGlobalGlobal extends Struct.SingleTypeSchema {
   };
 }
 
+export interface ApiMonthlyGoalMonthlyGoal extends Struct.CollectionTypeSchema {
+  collectionName: 'monthly_goals';
+  info: {
+    description: 'Metas de venta mensuales para el panel de metricas';
+    displayName: 'Meta mensual';
+    pluralName: 'monthly-goals';
+    singularName: 'monthly-goal';
+  };
+  options: {
+    draftAndPublish: false;
+  };
+  attributes: {
+    amount: Schema.Attribute.Integer & Schema.Attribute.Required;
+    createdAt: Schema.Attribute.DateTime;
+    createdBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
+      Schema.Attribute.Private;
+    goalName: Schema.Attribute.String;
+    locale: Schema.Attribute.String & Schema.Attribute.Private;
+    localizations: Schema.Attribute.Relation<
+      'oneToMany',
+      'api::monthly-goal.monthly-goal'
+    > &
+      Schema.Attribute.Private;
+    month: Schema.Attribute.Integer & Schema.Attribute.Required;
+    publishedAt: Schema.Attribute.DateTime;
+    updatedAt: Schema.Attribute.DateTime;
+    updatedBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
+      Schema.Attribute.Private;
+    year: Schema.Attribute.Integer & Schema.Attribute.Required;
+  };
+}
+
 export interface ApiOrderImprimeOrderImprime
   extends Struct.CollectionTypeSchema {
   collectionName: 'order_imprimes';
@@ -1569,6 +1601,7 @@ declare module '@strapi/strapi' {
       'api::bodega.bodega': ApiBodegaBodega;
       'api::category.category': ApiCategoryCategory;
       'api::global.global': ApiGlobalGlobal;
+      'api::monthly-goal.monthly-goal': ApiMonthlyGoalMonthlyGoal;
       'api::order-imprime.order-imprime': ApiOrderImprimeOrderImprime;
       'api::order-item.order-item': ApiOrderItemOrderItem;
       'api::order.order': ApiOrderOrder;
