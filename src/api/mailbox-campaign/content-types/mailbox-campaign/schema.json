@@ -1,0 +1,77 @@
+{
+  "kind": "collectionType",
+  "collectionName": "mailbox_campaigns",
+  "info": {
+    "singularName": "mailbox-campaign",
+    "pluralName": "mailbox-campaigns",
+    "displayName": "Mailbox Campaign",
+    "description": "Historico de correos enviados desde el buzon de bodega"
+  },
+  "options": {
+    "draftAndPublish": false
+  },
+  "pluginOptions": {},
+  "attributes": {
+    "campaignName": {
+      "type": "string",
+      "required": true
+    },
+    "subject": {
+      "type": "string",
+      "required": true
+    },
+    "scheduledAt": {
+      "type": "datetime",
+      "required": true
+    },
+    "scheduledDay": {
+      "type": "integer"
+    },
+    "scheduledMonth": {
+      "type": "integer"
+    },
+    "scheduledYear": {
+      "type": "integer"
+    },
+    "scheduledTime": {
+      "type": "string"
+    },
+    "audienceTab": {
+      "type": "enumeration",
+      "enum": [
+        "clients",
+        "subscribed"
+      ]
+    },
+    "selectionMode": {
+      "type": "string"
+    },
+    "recipientCount": {
+      "type": "integer"
+    },
+    "recipientIds": {
+      "type": "json"
+    },
+    "recipientEmails": {
+      "type": "json"
+    },
+    "fileName": {
+      "type": "string"
+    },
+    "status": {
+      "type": "enumeration",
+      "enum": [
+        "scheduled",
+        "sent",
+        "failed"
+      ],
+      "default": "scheduled"
+    },
+    "sentAt": {
+      "type": "datetime"
+    },
+    "errorMessage": {
+      "type": "text"
+    }
+  }
+}

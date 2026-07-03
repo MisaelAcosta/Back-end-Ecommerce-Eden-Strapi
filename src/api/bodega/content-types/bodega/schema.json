@@ -59,6 +59,9 @@
     "paintCost": {
       "type": "integer"
     },
+    "flowCost": {
+      "type": "integer"
+    },
     "totalCost": {
       "type": "integer"
     },

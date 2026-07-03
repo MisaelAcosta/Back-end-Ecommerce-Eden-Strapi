@@ -535,6 +535,7 @@ export interface ApiBodegaBodega extends Struct.CollectionTypeSchema {
     createdAt: Schema.Attribute.DateTime;
     createdBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
       Schema.Attribute.Private;
+    flowCost: Schema.Attribute.Integer;
     imageUrlSnapshot: Schema.Attribute.Text;
     lightCost: Schema.Attribute.Integer;
     locale: Schema.Attribute.String & Schema.Attribute.Private;
@@ -635,6 +636,52 @@ export interface ApiGlobalGlobal extends Struct.SingleTypeSchema {
     publishedAt: Schema.Attribute.DateTime;
     siteDescription: Schema.Attribute.Text & Schema.Attribute.Required;
     siteName: Schema.Attribute.String & Schema.Attribute.Required;
+    updatedAt: Schema.Attribute.DateTime;
+    updatedBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
+      Schema.Attribute.Private;
+  };
+}
+
+export interface ApiMailboxCampaignMailboxCampaign
+  extends Struct.CollectionTypeSchema {
+  collectionName: 'mailbox_campaigns';
+  info: {
+    description: 'Historico de correos enviados desde el buzon de bodega';
+    displayName: 'Mailbox Campaign';
+    pluralName: 'mailbox-campaigns';
+    singularName: 'mailbox-campaign';
+  };
+  options: {
+    draftAndPublish: false;
+  };
+  attributes: {
+    audienceTab: Schema.Attribute.Enumeration<['clients', 'subscribed']>;
+    campaignName: Schema.Attribute.String & Schema.Attribute.Required;
+    createdAt: Schema.Attribute.DateTime;
+    createdBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
+      Schema.Attribute.Private;
+    errorMessage: Schema.Attribute.Text;
+    fileName: Schema.Attribute.String;
+    locale: Schema.Attribute.String & Schema.Attribute.Private;
+    localizations: Schema.Attribute.Relation<
+      'oneToMany',
+      'api::mailbox-campaign.mailbox-campaign'
+    > &
+      Schema.Attribute.Private;
+    publishedAt: Schema.Attribute.DateTime;
+    recipientCount: Schema.Attribute.Integer;
+    recipientEmails: Schema.Attribute.JSON;
+    recipientIds: Schema.Attribute.JSON;
+    scheduledAt: Schema.Attribute.DateTime & Schema.Attribute.Required;
+    scheduledDay: Schema.Attribute.Integer;
+    scheduledMonth: Schema.Attribute.Integer;
+    scheduledTime: Schema.Attribute.String;
+    scheduledYear: Schema.Attribute.Integer;
+    selectionMode: Schema.Attribute.String;
+    sentAt: Schema.Attribute.DateTime;
+    status: Schema.Attribute.Enumeration<['scheduled', 'sent', 'failed']> &
+      Schema.Attribute.DefaultTo<'scheduled'>;
+    subject: Schema.Attribute.String & Schema.Attribute.Required;
     updatedAt: Schema.Attribute.DateTime;
     updatedBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
       Schema.Attribute.Private;
@@ -1601,6 +1648,7 @@ declare module '@strapi/strapi' {
       'api::bodega.bodega': ApiBodegaBodega;
       'api::category.category': ApiCategoryCategory;
       'api::global.global': ApiGlobalGlobal;
+      'api::mailbox-campaign.mailbox-campaign': ApiMailboxCampaignMailboxCampaign;
       'api::monthly-goal.monthly-goal': ApiMonthlyGoalMonthlyGoal;
       'api::order-imprime.order-imprime': ApiOrderImprimeOrderImprime;
       'api::order-item.order-item': ApiOrderItemOrderItem;

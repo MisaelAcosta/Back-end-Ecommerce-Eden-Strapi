@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useState } from 'react';
+import { type ChangeEvent, useEffect, useMemo, useState } from 'react';
 import { useFetchClient } from '@strapi/admin/strapi-admin';
-import { Copy, Save, SquarePen } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Copy, Mail, Save, Search, Send, SquarePen, Upload } from 'lucide-react';
 
 type WarehouseCategory = {
   id: number;
@@ -37,6 +37,7 @@ type WarehouseBodegaRow = {
   lightCost: number;
   boxCost: number;
   paintCost: number;
+  flowCost: number;
   totalCost: number;
   price: number;
   returnAmount: number;
@@ -51,6 +52,26 @@ type WarehouseResponse = {
 
 type SaveWarehouseRowResponse = {
   data: WarehouseVariant;
+};
+
+type MailboxRecipient = {
+  id: number;
+  documentId?: string;
+  email: string;
+  name?: string;
+  isSubscribed: boolean;
+};
+
+type MailboxRecipientsResponse = {
+  data: MailboxRecipient[];
+};
+
+type MailboxSendResponse = {
+  data: {
+    scheduled: boolean;
+    scheduledAt?: string;
+    total: number;
+  };
 };
 
 type EditableVariantFields = {
@@ -80,6 +101,25 @@ const FILAMENT_PRICE_PER_KG = 12000;
 const RESIN_PRICE_PER_LITER = 19000;
 const BAMBU_A1_AVERAGE_WATTS = 150;
 const ENEL_SANTIAGO_CLP_PER_KWH = 220;
+const MAILBOX_VISIBLE_DAYS = 7;
+const FLOW_FEE_RATE = 0.0319;
+
+const monthNames = [
+  'enero',
+  'febrero',
+  'marzo',
+  'abril',
+  'mayo',
+  'junio',
+  'julio',
+  'agosto',
+  'septiembre',
+  'octubre',
+  'noviembre',
+  'diciembre',
+];
+
+const weekdayNames = ['Dom.', 'Lun.', 'Mar.', 'Mier.', 'Juev.', 'Vier.', 'Sab.'];
 
 const emptyEditableFields: EditableVariantFields = {
   materialGrams: '',
@@ -113,13 +153,15 @@ const getVariantCosts = (draft: EditableVariantFields, price: number) => {
   const lightCost = Math.round(parseTableNumber(draft.lightCost));
   const boxCost = Math.round(parseTableNumber(draft.boxCost));
   const paintCost = Math.round(parseTableNumber(draft.paintCost));
-  const totalCost = materialCost + lightCost + boxCost + paintCost;
+  const flowCost = Math.round(Number(price || 0) * FLOW_FEE_RATE);
+  const totalCost = materialCost + lightCost + boxCost + paintCost + flowCost;
 
   return {
     materialCost,
     lightCost,
     boxCost,
     paintCost,
+    flowCost,
     totalCost,
     returnAmount: Math.round(Number(price || 0)) - totalCost,
   };
@@ -136,6 +178,22 @@ const dedupeVariants = (items: WarehouseVariant[]) => {
   });
 
   return Array.from(variantsByKey.values());
+};
+
+const toDateInputValue = (date: Date) =>
+  `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+
+const toMailboxTimeValue = (date: Date) =>
+  `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
+
+const buildScheduledDate = (dateValue: string, timeValue: string) => new Date(`${dateValue}T${timeValue || '00:00'}:00`);
+
+const getSafeMonthDate = (dateValue: string, nextYear: number, nextMonth: number) => {
+  const currentDate = new Date(`${dateValue}T00:00:00`);
+  const maxDay = new Date(nextYear, nextMonth + 1, 0).getDate();
+  const nextDate = new Date(nextYear, nextMonth, Math.min(currentDate.getDate(), maxDay));
+
+  return toDateInputValue(nextDate);
 };
 
 const WarehousePage = () => {
@@ -341,7 +399,7 @@ const WarehousePage = () => {
               <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px' }}>
                 <thead>
                   <tr style={{ color: '#9c9c9c', textAlign: 'left' }}>
-                    {['Nombre', 'G. Mat.', 'T. Imp.', 'C. Mat.', 'C. luz', 'G. Caja', 'Pintura', 'Total', 'Precio', 'Retorno', ''].map(
+                    {['Nombre', 'G. Mat.', 'T. Imp.', 'C. Mat.', 'C. luz', 'G. Caja', 'Pintura', 'Flow T.', 'Total', 'Precio', 'Retorno', ''].map(
                       (heading) => (
                         <th key={heading} style={{ fontWeight: 400, padding: '0 12px 18px' }}>
                           {heading}
@@ -353,7 +411,7 @@ const WarehousePage = () => {
                 <tbody>
                   {activeVariants.length === 0 ? (
                     <tr>
-                      <td colSpan={11} style={{ border: '1px solid #3f3f3f', color: '#777777', padding: '24px 12px' }}>
+                      <td colSpan={12} style={{ border: '1px solid #3f3f3f', color: '#777777', padding: '24px 12px' }}>
                         No hay variantes en esta categoria.
                       </td>
                     </tr>
@@ -406,7 +464,8 @@ const WarehousePage = () => {
                             onChange={(value) => updateVariantDraft(variant, 'paintCost', value)}
                             value={draft.paintCost}
                           />
-                          {/* Total: suma solo columnas CLP, no gramos ni horas. */}
+                          <td style={cellStyles}>{formatPrice(costs.flowCost)}</td>
+                          {/* Total: suma solo columnas CLP, incluido Flow T.; no gramos ni horas. */}
                           <td style={cellStyles}>{costs.totalCost ? formatPrice(costs.totalCost) : '--'}</td>
                           <td style={cellStyles}>{formatPrice(variant.price)}</td>
                           {/* Retorno: precio menos total de gastos. Este dato tambien se guarda en Bodega. */}
@@ -505,7 +564,7 @@ const CalculatorBlock = () => {
   const [selectedMaterial, setSelectedMaterial] = useState<'filament' | 'resin'>('filament');
   const [grams, setGrams] = useState('');
   const [time, setTime] = useState('');
-  const [copiedTotal, setCopiedTotal] = useState(false);
+  const [copiedResult, setCopiedResult] = useState<'print' | 'electric' | 'total' | null>(null);
 
   const materialPrice = selectedMaterial === 'filament' ? FILAMENT_PRICE_PER_KG : RESIN_PRICE_PER_LITER;
   const gramsValue = Number(grams.replace(',', '.')) || 0;
@@ -514,10 +573,10 @@ const CalculatorBlock = () => {
   const electricCost = Math.round(printHours * (BAMBU_A1_AVERAGE_WATTS / 1000) * ENEL_SANTIAGO_CLP_PER_KWH);
   const total = printCost + electricCost;
 
-  const copyTotal = async () => {
-    await navigator.clipboard.writeText(String(total));
-    setCopiedTotal(true);
-    window.setTimeout(() => setCopiedTotal(false), 1400);
+  const copyCalculatorValue = async (key: 'print' | 'electric' | 'total', value: number) => {
+    await navigator.clipboard.writeText(String(value));
+    setCopiedResult(key);
+    window.setTimeout(() => setCopiedResult(null), 1400);
   };
 
   return (
@@ -556,9 +615,6 @@ const CalculatorBlock = () => {
               placeholder="Tiempo"
               value={time}
             />
-            <button style={calculatorButtonStyles} type="button">
-              Calcular
-            </button>
           </div>
         </div>
         <div>
@@ -584,8 +640,20 @@ const CalculatorBlock = () => {
           {/* Resultado calculado: costo de material, costo electrico y total copiable. */}
           <div style={{ display: 'grid', gap: '18px', color: '#cfcfcf', fontSize: '11px' }}>
             <div>Resultado</div>
-            <ResultRow label="Cost. Impr." value={formatPrice(printCost)} />
-            <ResultRow label="Cost. Elec." value={formatPrice(electricCost)} />
+            <ResultRow
+              copied={copiedResult === 'print'}
+              label="Cost. Impr."
+              numericValue={printCost}
+              onCopy={() => copyCalculatorValue('print', printCost)}
+              value={formatPrice(printCost)}
+            />
+            <ResultRow
+              copied={copiedResult === 'electric'}
+              label="Cost. Elec."
+              numericValue={electricCost}
+              onCopy={() => copyCalculatorValue('electric', electricCost)}
+              value={formatPrice(electricCost)}
+            />
             <div style={calculatorTotalStyles}>
               <span>Total</span>
               <span>{formatPrice(total)}</span>
@@ -593,7 +661,7 @@ const CalculatorBlock = () => {
               <button
                 aria-label="Copiar total"
                 disabled={total <= 0}
-                onClick={copyTotal}
+                onClick={() => copyCalculatorValue('total', total)}
                 style={{
                   ...calculatorCopyButtonStyles,
                   cursor: total > 0 ? 'pointer' : 'not-allowed',
@@ -603,7 +671,7 @@ const CalculatorBlock = () => {
               >
                 <Copy size={14} />
               </button>
-              {copiedTotal && <span style={copiedTotalStyles}>Copiado</span>}
+              {copiedResult === 'total' && <span style={copiedTotalStyles}>Copiado</span>}
             </div>
           </div>
         </div>
@@ -612,12 +680,38 @@ const CalculatorBlock = () => {
   );
 };
 
-const ResultRow = ({ label, value }: { label: string; value: string }) => (
+const ResultRow = ({
+  copied,
+  label,
+  numericValue,
+  onCopy,
+  value,
+}: {
+  copied: boolean;
+  label: string;
+  numericValue: number;
+  onCopy: () => void;
+  value: string;
+}) => (
   // Fila simple de resultado dentro de la calculadora.
   // La linea divisoria se controla con borderBottom aqui.
-  <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid #4a4a4a', paddingBottom: '8px' }}>
+  <div style={calculatorResultRowStyles}>
     <span>{label}</span>
     <span>{value}</span>
+    <button
+      aria-label={`Copiar ${label}`}
+      disabled={numericValue <= 0}
+      onClick={onCopy}
+      style={{
+        ...calculatorCopyButtonStyles,
+        cursor: numericValue > 0 ? 'pointer' : 'not-allowed',
+        opacity: numericValue > 0 ? 1 : 0.35,
+      }}
+      type="button"
+    >
+      <Copy size={14} />
+    </button>
+    {copied && <span style={copiedResultRowStyles}>Copiado</span>}
   </div>
 );
 
@@ -687,21 +781,671 @@ const parsePrintHours = (value: string) => {
   return Number(normalizedValue) || 0;
 };
 
-const MailboxBlock = () => (
-  // Bloque BUZON visual. Por ahora es maqueta para la futura funcionalidad de suscritos/clientes.
-  <section style={{ ...blockStyles, minHeight: '430px', padding: '18px' }} aria-label="Buzon">
-    <h2 style={{ margin: 0, fontSize: '16px', fontWeight: 500 }}>Buzon</h2>
-    <div style={{ height: '90px', marginTop: '22px', background: '#3a3a3a' }} />
-    <div style={{ marginTop: '14px', border: '1px solid #242424', minHeight: '180px', padding: '14px' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', color: '#cfcfcf', fontSize: '12px' }}>
-        <span>
-          Suscritos <span style={{ color: '#C0FF01' }}>•</span>
-        </span>
-        <span>Todos</span>
+const MailboxBlock = () => {
+  const { get, post } = useFetchClient();
+  const now = useMemo(() => new Date(), []);
+  const [recipients, setRecipients] = useState<MailboxRecipient[]>([]);
+  const [selectedRecipientIds, setSelectedRecipientIds] = useState<number[]>([]);
+  const [activeList, setActiveList] = useState<'subscribed' | 'clients'>('clients');
+  const [searchValue, setSearchValue] = useState('');
+  const [selectedDate, setSelectedDate] = useState(toDateInputValue(now));
+  const [visibleStartDate, setVisibleStartDate] = useState(toDateInputValue(now));
+  const [selectedTime, setSelectedTime] = useState(toMailboxTimeValue(now));
+  const [isMonthPickerOpen, setIsMonthPickerOpen] = useState(false);
+  const [subject, setSubject] = useState('Promocion Eden');
+  const [htmlContent, setHtmlContent] = useState('');
+  const [fileName, setFileName] = useState('');
+  const [selectionMode, setSelectionMode] = useState('Seleccionados');
+  const [isLoadingRecipients, setIsLoadingRecipients] = useState(true);
+  const [isSending, setIsSending] = useState(false);
+  const [mailboxMessage, setMailboxMessage] = useState<string | null>(null);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    const loadRecipients = async () => {
+      setIsLoadingRecipients(true);
+
+      try {
+        const response = await get<MailboxRecipientsResponse>('/order-dashboard/mailbox/recipients');
+
+        if (isMounted) {
+          setRecipients(response.data.data || []);
+        }
+      } catch (err) {
+        if (isMounted) {
+          setMailboxMessage(err instanceof Error ? err.message : 'No se pudieron cargar los clientes.');
+        }
+      } finally {
+        if (isMounted) {
+          setIsLoadingRecipients(false);
+        }
+      }
+    };
+
+    loadRecipients();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [get]);
+
+  const subscribedRecipients = useMemo(() => recipients.filter((recipient) => recipient.isSubscribed), [recipients]);
+  const visibleRecipients = useMemo(() => {
+    const source = activeList === 'subscribed' ? subscribedRecipients : recipients;
+    const query = searchValue.trim().toLowerCase();
+
+    if (!query) return source;
+
+    return source.filter((recipient) =>
+      [recipient.email, recipient.name].some((value) => String(value || '').toLowerCase().includes(query))
+    );
+  }, [activeList, recipients, searchValue, subscribedRecipients]);
+  const selectedSet = useMemo(() => new Set(selectedRecipientIds), [selectedRecipientIds]);
+  const allVisibleSelected =
+    visibleRecipients.length > 0 && visibleRecipients.every((recipient) => selectedSet.has(recipient.id));
+  const scheduledDate = buildScheduledDate(selectedDate, selectedTime);
+  const calendarStart = useMemo(() => {
+    const start = new Date(`${visibleStartDate}T00:00:00`);
+    start.setHours(0, 0, 0, 0);
+
+    return start;
+  }, [visibleStartDate]);
+  const calendarDays = useMemo(
+    () =>
+      Array.from({ length: MAILBOX_VISIBLE_DAYS }, (_, index) => {
+        const date = new Date(calendarStart);
+        date.setDate(calendarStart.getDate() + index);
+
+        return date;
+      }),
+    [calendarStart]
+  );
+
+  const toggleRecipient = (recipientId: number) => {
+    setSelectionMode('Seleccionados');
+    setSelectedRecipientIds((currentIds) =>
+      currentIds.includes(recipientId)
+        ? currentIds.filter((currentId) => currentId !== recipientId)
+        : [...currentIds, recipientId]
+    );
+  };
+
+  const changeSelectedYear = (yearDelta: number) => {
+    const date = new Date(`${selectedDate}T00:00:00`);
+    const nextDate = getSafeMonthDate(selectedDate, date.getFullYear() + yearDelta, date.getMonth());
+
+    setSelectedDate(nextDate);
+    setVisibleStartDate(nextDate);
+  };
+
+  const selectMonth = (monthIndex: number) => {
+    const nextDate = getSafeMonthDate(selectedDate, new Date(`${selectedDate}T00:00:00`).getFullYear(), monthIndex);
+
+    setSelectedDate(nextDate);
+    setVisibleStartDate(nextDate);
+    setIsMonthPickerOpen(false);
+  };
+
+  const selectDay = (dateValue: string) => {
+    setSelectedDate(dateValue);
+  };
+
+  const shiftVisibleDays = (dayDelta: number) => {
+    setVisibleStartDate((currentDate) => {
+      const date = new Date(`${currentDate}T00:00:00`);
+      date.setDate(date.getDate() + dayDelta);
+
+      return toDateInputValue(date);
+    });
+  };
+
+  const selectGroup = (group: 'all' | 'visible' | 'subscribed' | 'clients') => {
+    const groupRecipients =
+      group === 'all' ? recipients : group === 'visible' ? visibleRecipients : group === 'subscribed' ? subscribedRecipients : recipients;
+    const nextSelectionMode =
+      group === 'all'
+        ? 'Todos'
+        : group === 'visible'
+          ? 'Seleccionar todos'
+          : group === 'subscribed'
+            ? 'Suscritos'
+            : 'Clientes';
+
+    setSelectionMode(nextSelectionMode);
+    setSelectedRecipientIds((currentIds) =>
+      Array.from(new Set([...currentIds, ...groupRecipients.map((recipient) => recipient.id)]))
+    );
+  };
+
+  const toggleVisibleSelection = () => {
+    if (allVisibleSelected) {
+      const visibleIds = new Set(visibleRecipients.map((recipient) => recipient.id));
+      setSelectionMode('Seleccionados');
+      setSelectedRecipientIds((currentIds) => currentIds.filter((id) => !visibleIds.has(id)));
+      return;
+    }
+
+    selectGroup('visible');
+  };
+
+  const handleFileChange = async (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+
+    if (!file) return;
+
+    setFileName(file.name);
+    setHtmlContent(await file.text());
+    setMailboxMessage(null);
+  };
+
+  const sendCampaign = async () => {
+    setIsSending(true);
+    setMailboxMessage(null);
+
+    try {
+      const response = await post<MailboxSendResponse>('/order-dashboard/mailbox/send', {
+        subject,
+        html: htmlContent,
+        recipientIds: selectedRecipientIds,
+        scheduledAt: scheduledDate.toISOString(),
+        scheduledDateValue: selectedDate,
+        scheduledTime: selectedTime,
+        audienceTab: activeList,
+        selectionMode,
+        fileName,
+      });
+      const result = response.data.data;
+
+      setMailboxMessage(
+        result.scheduled
+          ? `Programado para ${scheduledDate.toLocaleString('es-CL')} (${result.total} correos).`
+          : `Correo enviado a ${result.total} cliente(s).`
+      );
+    } catch (err) {
+      setMailboxMessage(err instanceof Error ? err.message : 'No se pudo enviar el correo.');
+    } finally {
+      setIsSending(false);
+    }
+  };
+
+  return (
+    <section style={{ ...blockStyles, minHeight: '430px', padding: '18px' }} aria-label="Buzon">
+      <div style={mailboxHeaderStyles}>
+        <h2 style={{ margin: 0, fontSize: '16px', fontWeight: 500 }}>Buzon</h2>
+        <span style={mailboxMonthStyles}>{monthNames[scheduledDate.getMonth()]}</span>
       </div>
-    </div>
-  </section>
-);
+
+      <div style={mailboxScheduleStyles}>
+        <span style={mailboxScheduleLabelStyles}>
+          Dia {!isMonthPickerOpen && <span style={{ color: '#C0FF01' }}>•</span>}
+        </span>
+        <button onClick={() => setIsMonthPickerOpen((isOpen) => !isOpen)} style={mailboxMonthButtonStyles} type="button">
+          Mes {isMonthPickerOpen && <span style={{ color: '#C0FF01' }}>•</span>}
+        </button>
+        <div style={mailboxYearControlStyles}>
+          <button onClick={() => changeSelectedYear(-1)} style={mailboxArrowButtonStyles} type="button">
+            <ChevronLeft size={14} />
+          </button>
+          <span>{scheduledDate.getFullYear()}</span>
+          <button onClick={() => changeSelectedYear(1)} style={mailboxArrowButtonStyles} type="button">
+            <ChevronRight size={14} />
+          </button>
+        </div>
+        <label style={mailboxTimeLabelStyles}>
+          Hora
+          <input onChange={(event) => setSelectedTime(event.target.value)} style={mailboxTimeInputStyles} type="time" value={selectedTime} />
+        </label>
+      </div>
+
+      {isMonthPickerOpen && (
+        <div style={mailboxMonthsRowStyles}>
+          {monthNames.map((monthName, monthIndex) => {
+            const isActive = monthIndex === scheduledDate.getMonth();
+
+            return (
+              <button
+                key={monthName}
+                onClick={() => selectMonth(monthIndex)}
+                style={{
+                  ...mailboxMonthChipStyles,
+                  borderColor: isActive ? '#C0FF01' : '#4d4d4d',
+                  color: isActive ? '#ffffff' : '#cfcfcf',
+                }}
+                type="button"
+              >
+                {monthName.slice(0, 3)}
+              </button>
+            );
+          })}
+        </div>
+      )}
+
+      <div style={mailboxDaysRowStyles}>
+        <button onClick={() => shiftVisibleDays(-MAILBOX_VISIBLE_DAYS)} style={mailboxDayNavButtonStyles} type="button">
+          <ChevronLeft size={20} />
+        </button>
+        {calendarDays.map((date) => {
+          const dateValue = toDateInputValue(date);
+          const isActive = dateValue === selectedDate;
+
+          return (
+            <button
+              key={dateValue}
+              onClick={() => selectDay(dateValue)}
+              style={{
+                ...mailboxDayButtonStyles,
+                borderColor: isActive ? '#C0FF01' : '#4d4d4d',
+              }}
+              type="button"
+            >
+              <span style={{ color: isActive ? '#C0FF01' : '#d7d7d7', fontSize: '13px', lineHeight: 1 }}>•</span>
+              <span style={{ fontSize: '10px', color: '#a5a5a5' }}>{weekdayNames[date.getDay()]}</span>
+              <span>{String(date.getDate()).padStart(2, '0')}</span>
+            </button>
+          );
+        })}
+        <button onClick={() => shiftVisibleDays(MAILBOX_VISIBLE_DAYS)} style={mailboxDayNavButtonStyles} type="button">
+          <ChevronRight size={20} />
+        </button>
+      </div>
+
+      <div style={mailboxTableStyles}>
+        <div style={mailboxTabsStyles}>
+          <button onClick={() => setActiveList('subscribed')} style={getMailboxTabStyles(activeList === 'subscribed')} type="button">
+            Suscritos {activeList === 'subscribed' && <span style={{ color: '#C0FF01' }}>•</span>}
+          </button>
+          <button onClick={() => setActiveList('clients')} style={getMailboxTabStyles(activeList === 'clients')} type="button">
+            Clientes {activeList === 'clients' && <span style={{ color: '#C0FF01' }}>•</span>}
+          </button>
+          <label style={mailboxSearchStyles}>
+            <Search size={13} />
+            <input
+              onChange={(event) => setSearchValue(event.target.value)}
+              placeholder="Buscar"
+              style={mailboxSearchInputStyles}
+              value={searchValue}
+            />
+          </label>
+          <button onClick={() => selectGroup('all')} style={mailboxAllButtonStyles} type="button">
+            Todos <span style={mailboxSquareStyles} />
+          </button>
+        </div>
+
+        <div style={mailboxSummaryStyles}>
+          <button onClick={toggleVisibleSelection} style={mailboxSelectAllStyles} type="button">
+            Seleccionar todos <span style={mailboxTinyCheckStyles}>{allVisibleSelected ? '■' : '□'}</span>
+          </button>
+          <span>Total {visibleRecipients.length}</span>
+        </div>
+
+        <div style={mailboxRowsStyles}>
+          {isLoadingRecipients ? (
+            <p style={mailboxEmptyStyles}>Cargando clientes...</p>
+          ) : visibleRecipients.length === 0 ? (
+            <p style={mailboxEmptyStyles}>No hay clientes para mostrar.</p>
+          ) : (
+            visibleRecipients.map((recipient, index) => (
+              <label key={recipient.id} style={mailboxRecipientRowStyles}>
+                <span style={mailboxRecipientIndexStyles}>{String(index + 1).padStart(2, '0')}</span>
+                <span style={mailboxRecipientEmailStyles} title={recipient.email}>
+                  {recipient.email}
+                </span>
+                <input
+                  checked={selectedSet.has(recipient.id)}
+                  onChange={() => toggleRecipient(recipient.id)}
+                  style={mailboxCheckboxStyles}
+                  type="checkbox"
+                />
+              </label>
+            ))
+          )}
+        </div>
+      </div>
+
+      <input accept=".html,.htm,text/html" id="mailbox-html-file" onChange={handleFileChange} style={{ display: 'none' }} type="file" />
+      <div style={mailboxFooterStyles}>
+        <label htmlFor="mailbox-html-file" style={mailboxFileButtonStyles}>
+          <Upload size={14} />
+          <span>
+            Seleccionar archivo
+            <small style={mailboxFileNameStyles}>{fileName || 'archivo.html'}</small>
+          </span>
+        </label>
+        <input onChange={(event) => setSubject(event.target.value)} placeholder="Asunto" style={mailboxSubjectStyles} value={subject} />
+        <button
+          disabled={isSending || selectedRecipientIds.length === 0 || !htmlContent}
+          onClick={sendCampaign}
+          style={{
+            ...mailboxSendButtonStyles,
+            cursor: isSending || selectedRecipientIds.length === 0 || !htmlContent ? 'not-allowed' : 'pointer',
+            opacity: isSending || selectedRecipientIds.length === 0 || !htmlContent ? 0.45 : 1,
+          }}
+          type="button"
+        >
+          {isSending ? <Mail size={14} /> : <Send size={14} />}
+          Enviar
+        </button>
+      </div>
+      {mailboxMessage && <p style={mailboxMessageStyles}>{mailboxMessage}</p>}
+    </section>
+  );
+};
+
+const mailboxHeaderStyles = {
+  display: 'flex',
+  justifyContent: 'space-between',
+  alignItems: 'center',
+  color: '#d8d8d8',
+} as const;
+
+const mailboxMonthStyles = {
+  fontSize: '18px',
+  color: '#eeeeee',
+} as const;
+
+const mailboxScheduleStyles = {
+  display: 'grid',
+  gridTemplateColumns: '70px 50px 126px 96px',
+  alignItems: 'center',
+  gap: '8px',
+  marginTop: '22px',
+  color: '#eeeeee',
+  fontSize: '12px',
+} as const;
+
+const mailboxScheduleLabelStyles = {
+  paddingLeft: '14px',
+} as const;
+
+const mailboxMonthButtonStyles = {
+  height: '28px',
+  border: 0,
+  background: 'transparent',
+  color: '#eeeeee',
+  fontSize: '12px',
+  textAlign: 'left',
+  cursor: 'pointer',
+} as const;
+
+const mailboxYearControlStyles = {
+  display: 'grid',
+  gridTemplateColumns: '24px 1fr 24px',
+  alignItems: 'center',
+  justifyItems: 'center',
+  height: '28px',
+  width: '126px',
+  background: '#4a4a4a',
+  color: '#ededed',
+} as const;
+
+const mailboxArrowButtonStyles = {
+  display: 'inline-flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  width: '24px',
+  height: '28px',
+  border: 0,
+  background: 'transparent',
+  color: '#cfcfcf',
+  cursor: 'pointer',
+} as const;
+
+const mailboxTimeLabelStyles = {
+  display: 'grid',
+  gridTemplateColumns: 'auto 1fr',
+  alignItems: 'center',
+  gap: '8px',
+  justifySelf: 'start',
+} as const;
+
+const mailboxTimeInputStyles = {
+  width: '64px',
+  height: '28px',
+  border: '1px solid #3b3b3b',
+  background: '#202020',
+  color: '#ffffff',
+  fontSize: '11px',
+  padding: '0 4px',
+  boxSizing: 'border-box',
+} as const;
+
+const mailboxMonthsRowStyles = {
+  display: 'grid',
+  gridTemplateColumns: 'repeat(6, 1fr)',
+  gap: '8px',
+  marginTop: '12px',
+} as const;
+
+const mailboxMonthChipStyles = {
+  height: '34px',
+  border: '1px solid #4d4d4d',
+  borderRadius: '6px',
+  background: '#303030',
+  color: '#cfcfcf',
+  fontSize: '11px',
+  textTransform: 'capitalize',
+  cursor: 'pointer',
+} as const;
+
+const mailboxDaysRowStyles = {
+  display: 'grid',
+  gridTemplateColumns: `22px repeat(${MAILBOX_VISIBLE_DAYS}, minmax(0, 1fr)) 22px`,
+  alignItems: 'center',
+  gap: '8px',
+  marginTop: '16px',
+} as const;
+
+const mailboxDayNavButtonStyles = {
+  display: 'inline-flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  width: '22px',
+  height: '78px',
+  border: 0,
+  background: 'transparent',
+  color: '#d8d8d8',
+  fontSize: '18px',
+  cursor: 'pointer',
+} as const;
+
+const mailboxDayButtonStyles = {
+  display: 'grid',
+  justifyItems: 'center',
+  alignContent: 'center',
+  gap: '6px',
+  height: '78px',
+  border: '1px solid #4d4d4d',
+  borderRadius: '8px',
+  background: '#4a4a4a',
+  color: '#ffffff',
+  fontSize: '12px',
+  cursor: 'pointer',
+} as const;
+
+const mailboxTableStyles = {
+  marginTop: '26px',
+  border: '1px solid #3b3b3b',
+  minHeight: '200px',
+  background: '#151515',
+} as const;
+
+const mailboxTabsStyles = {
+  display: 'grid',
+  gridTemplateColumns: '96px 84px minmax(0, 1fr) 82px',
+  alignItems: 'center',
+  gap: '4px',
+  minHeight: '38px',
+  borderBottom: '1px solid #3b3b3b',
+  padding: '0 10px',
+} as const;
+
+const getMailboxTabStyles = (isActive: boolean) =>
+  ({
+    border: 0,
+    background: 'transparent',
+    color: isActive ? '#ffffff' : '#c8c8c8',
+    fontSize: '12px',
+    textAlign: 'left',
+    cursor: 'pointer',
+  }) as const;
+
+const mailboxSearchStyles = {
+  display: 'flex',
+  alignItems: 'center',
+  gap: '6px',
+  color: '#8e8e8e',
+} as const;
+
+const mailboxSearchInputStyles = {
+  width: '100%',
+  height: '28px',
+  border: 0,
+  background: 'transparent',
+  color: '#ffffff',
+  fontSize: '12px',
+  outline: 'none',
+} as const;
+
+const mailboxAllButtonStyles = {
+  display: 'inline-flex',
+  alignItems: 'center',
+  justifyContent: 'flex-end',
+  gap: '8px',
+  border: 0,
+  background: 'transparent',
+  color: '#dedede',
+  fontSize: '12px',
+  cursor: 'pointer',
+} as const;
+
+const mailboxSquareStyles = {
+  width: '12px',
+  height: '12px',
+  border: '1px solid #86b600',
+  background: '#2e3f00',
+} as const;
+
+const mailboxSummaryStyles = {
+  display: 'flex',
+  justifyContent: 'flex-end',
+  gap: '16px',
+  padding: '10px 16px 4px',
+  color: '#cfcfcf',
+  fontSize: '11px',
+} as const;
+
+const mailboxSelectAllStyles = {
+  border: 0,
+  background: 'transparent',
+  color: '#d8d8d8',
+  fontSize: '11px',
+  cursor: 'pointer',
+} as const;
+
+const mailboxTinyCheckStyles = {
+  marginLeft: '6px',
+  color: '#d8d8d8',
+} as const;
+
+const mailboxRowsStyles = {
+  display: 'grid',
+  alignContent: 'start',
+  maxHeight: '128px',
+  overflowY: 'auto',
+  padding: '2px 12px 12px',
+} as const;
+
+const mailboxRecipientRowStyles = {
+  display: 'grid',
+  gridTemplateColumns: '24px minmax(0, 1fr) 22px',
+  alignItems: 'center',
+  minHeight: '20px',
+  color: '#8d8d8d',
+  fontSize: '11px',
+  cursor: 'pointer',
+} as const;
+
+const mailboxRecipientIndexStyles = {
+  color: '#666666',
+} as const;
+
+const mailboxRecipientEmailStyles = {
+  overflow: 'hidden',
+  textOverflow: 'ellipsis',
+  whiteSpace: 'nowrap',
+} as const;
+
+const mailboxCheckboxStyles = {
+  width: '12px',
+  height: '12px',
+  justifySelf: 'end',
+  accentColor: '#C0FF01',
+} as const;
+
+const mailboxEmptyStyles = {
+  color: '#777777',
+  fontSize: '11px',
+  margin: '16px 0 0',
+} as const;
+
+const mailboxFooterStyles = {
+  display: 'grid',
+  gridTemplateColumns: 'minmax(0, 1fr) 138px 96px',
+  alignItems: 'center',
+  gap: '12px',
+  marginTop: '22px',
+} as const;
+
+const mailboxFileButtonStyles = {
+  display: 'inline-flex',
+  alignItems: 'center',
+  gap: '10px',
+  color: '#ffffff',
+  fontSize: '12px',
+  cursor: 'pointer',
+} as const;
+
+const mailboxFileNameStyles = {
+  display: 'block',
+  marginTop: '3px',
+  color: '#747474',
+  fontSize: '11px',
+  maxWidth: '190px',
+  overflow: 'hidden',
+  textOverflow: 'ellipsis',
+  whiteSpace: 'nowrap',
+} as const;
+
+const mailboxSubjectStyles = {
+  width: '100%',
+  height: '30px',
+  border: '1px solid #202020',
+  background: '#101010',
+  color: '#ffffff',
+  padding: '0 10px',
+  boxSizing: 'border-box',
+  fontSize: '11px',
+  outline: 'none',
+} as const;
+
+const mailboxSendButtonStyles = {
+  display: 'inline-flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  gap: '8px',
+  height: '30px',
+  border: 0,
+  background: '#202020',
+  color: '#ffffff',
+  fontSize: '12px',
+} as const;
+
+const mailboxMessageStyles = {
+  margin: '12px 0 0',
+  color: '#C0FF01',
+  fontSize: '11px',
+} as const;
 
 const pageStyles = {
   // Fondo general de la pagina Bodega.
@@ -744,17 +1488,6 @@ const inputStyles = {
   padding: '0 12px',
   boxSizing: 'border-box',
   fontSize: '11px',
-} as const;
-
-const calculatorButtonStyles = {
-  // Boton Calcular de la calculadora.
-  // Ahora el calculo es reactivo, pero el boton se conserva por diseno.
-  height: '34px',
-  border: 0,
-  background: '#c9c9c9',
-  color: '#111111',
-  fontSize: '11px',
-  cursor: 'default',
 } as const;
 
 const materialCardStyles = {
@@ -811,6 +1544,16 @@ const calculatorTotalStyles = {
   padding: '10px',
 } as const;
 
+const calculatorResultRowStyles = {
+  position: 'relative',
+  display: 'grid',
+  gridTemplateColumns: '1fr auto auto',
+  alignItems: 'center',
+  gap: '10px',
+  borderBottom: '1px solid #4a4a4a',
+  paddingBottom: '8px',
+} as const;
+
 const calculatorCopyButtonStyles = {
   // Icono Copy del total. Cambia color o tamano del boton aqui.
   display: 'inline-flex',
@@ -831,6 +1574,14 @@ const copiedTotalStyles = {
   bottom: '-20px',
   color: '#C0FF01',
   fontSize: '11px',
+} as const;
+
+const copiedResultRowStyles = {
+  position: 'absolute',
+  right: 0,
+  bottom: '-16px',
+  color: '#C0FF01',
+  fontSize: '10px',
 } as const;
 
 const productNameCellStyles = {

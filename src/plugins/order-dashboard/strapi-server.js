@@ -63,6 +63,10 @@ const toDecimal = (value) => {
   return Number.isFinite(numberValue) ? numberValue : 0;
 };
 
+const FLOW_FEE_RATE = 0.0319;
+
+const getFlowCost = (price) => toInteger(Number(price || 0) * FLOW_FEE_RATE);
+
 const compactBodega = (bodega) =>
   bodega
     ? {
@@ -75,6 +79,7 @@ const compactBodega = (bodega) =>
         lightCost: Number(bodega.lightCost || 0),
         boxCost: Number(bodega.boxCost || 0),
         paintCost: Number(bodega.paintCost || 0),
+        flowCost: Number(bodega.flowCost || 0),
         totalCost: Number(bodega.totalCost || 0),
         price: Number(bodega.price || 0),
         returnAmount: Number(bodega.returnAmount || 0),
@@ -111,6 +116,14 @@ const compactWarehouseVariant = (variant, bodega = null) => {
   };
 };
 
+const compactMailboxClient = (user) => ({
+  id: user.id,
+  documentId: user.documentId,
+  email: user.email,
+  name: user.nombre || user.username || '',
+  isSubscribed: Boolean(user.notifyEmail),
+});
+
 const buildBodegaData = ({ payload, variant }) => {
   const product = variant.product || {};
   const category = product.category || null;
@@ -119,7 +132,8 @@ const buildBodegaData = ({ payload, variant }) => {
   const lightCost = toInteger(payload.lightCost);
   const boxCost = toInteger(payload.boxCost);
   const paintCost = toInteger(payload.paintCost);
-  const totalCost = materialCost + lightCost + boxCost + paintCost;
+  const flowCost = getFlowCost(price);
+  const totalCost = materialCost + lightCost + boxCost + paintCost + flowCost;
   const imageUrl = compactMediaUrl(variant.image) || compactMediaUrl(product.images);
 
   return {
@@ -138,6 +152,7 @@ const buildBodegaData = ({ payload, variant }) => {
     lightCost,
     boxCost,
     paintCost,
+    flowCost,
     totalCost,
     price,
     returnAmount: price - totalCost,
@@ -375,6 +390,68 @@ const updateOrderVersions = async (id, data) => {
   return currentOrder ? compactOrder(currentOrder) : null;
 };
 
+const sendMailboxCampaign = async ({ html, recipients, subject }) => {
+  for (const recipient of recipients) {
+    await strapi.plugin('email').service('email').send({
+      to: recipient.email,
+      subject,
+      html,
+    });
+  }
+};
+
+const getCampaignDateParts = ({ scheduledAt, scheduledDateValue, scheduledTime }) => {
+  if (scheduledDateValue) {
+    const [year, month, day] = String(scheduledDateValue).split('-').map((value) => Number(value));
+
+    return {
+      scheduledDay: day || scheduledAt.getDate(),
+      scheduledMonth: month || scheduledAt.getMonth() + 1,
+      scheduledYear: year || scheduledAt.getFullYear(),
+      scheduledTime: scheduledTime || `${String(scheduledAt.getHours()).padStart(2, '0')}:${String(scheduledAt.getMinutes()).padStart(2, '0')}`,
+    };
+  }
+
+  return {
+    scheduledDay: scheduledAt.getDate(),
+    scheduledMonth: scheduledAt.getMonth() + 1,
+    scheduledYear: scheduledAt.getFullYear(),
+    scheduledTime: scheduledTime || `${String(scheduledAt.getHours()).padStart(2, '0')}:${String(scheduledAt.getMinutes()).padStart(2, '0')}`,
+  };
+};
+
+const createMailboxCampaignHistory = async ({
+  audienceTab,
+  fileName,
+  recipientIds,
+  recipients,
+  scheduledAt,
+  scheduledDateValue,
+  scheduledTime,
+  selectionMode,
+  status,
+  subject,
+}) => {
+  const dateParts = getCampaignDateParts({ scheduledAt, scheduledDateValue, scheduledTime });
+
+  return strapi.db.query('api::mailbox-campaign.mailbox-campaign').create({
+    data: {
+      campaignName: subject,
+      subject,
+      scheduledAt,
+      ...dateParts,
+      audienceTab,
+      selectionMode,
+      recipientCount: recipients.length,
+      recipientIds,
+      recipientEmails: recipients.map((recipient) => recipient.email),
+      fileName,
+      status,
+      sentAt: status === 'sent' ? new Date() : null,
+    },
+  });
+};
+
 module.exports = () => ({
   controllers: {
     orders: {
@@ -529,6 +606,133 @@ module.exports = () => ({
 
         ctx.body = {
           data: compactWarehouseVariant(variant, savedBodega),
+        };
+      },
+    },
+    mailbox: {
+      async findRecipients(ctx) {
+        const users = await strapi.db.query('plugin::users-permissions.user').findMany({
+          where: {
+            blocked: { $ne: true },
+          },
+          limit: 1000,
+          orderBy: [{ createdAt: 'desc' }],
+        });
+
+        ctx.body = {
+          data: users.filter((user) => user.email).map(compactMailboxClient),
+        };
+      },
+      async sendCampaign(ctx) {
+        const body = ctx.request.body || {};
+        const html = String(body.html || '').trim();
+        const subject = String(body.subject || 'Promocion Eden').trim();
+        const scheduledAt = body.scheduledAt ? new Date(body.scheduledAt) : null;
+        const scheduledDateValue = String(body.scheduledDateValue || '').trim();
+        const scheduledTime = String(body.scheduledTime || '').trim();
+        const audienceTab = ['clients', 'subscribed'].includes(body.audienceTab) ? body.audienceTab : 'clients';
+        const selectionMode = String(body.selectionMode || 'Seleccionados').trim();
+        const fileName = String(body.fileName || '').trim();
+        const recipientIds = Array.isArray(body.recipientIds)
+          ? body.recipientIds.map((id) => Number(id)).filter(Boolean)
+          : [];
+
+        if (!html) {
+          return ctx.badRequest('Debes seleccionar un archivo HTML para enviar.');
+        }
+
+        if (recipientIds.length === 0) {
+          return ctx.badRequest('Debes seleccionar al menos un cliente.');
+        }
+
+        if (!scheduledAt || Number.isNaN(scheduledAt.getTime())) {
+          return ctx.badRequest('Debes seleccionar una fecha y hora valida.');
+        }
+
+        const users = await strapi.db.query('plugin::users-permissions.user').findMany({
+          where: {
+            id: { $in: recipientIds },
+            blocked: { $ne: true },
+          },
+          limit: 1000,
+        });
+        const recipients = users.filter((user) => user.email);
+
+        if (recipients.length === 0) {
+          return ctx.badRequest('No hay correos validos para enviar.');
+        }
+
+        if (scheduledAt && scheduledAt.getTime() > Date.now()) {
+          const delay = Math.min(scheduledAt.getTime() - Date.now(), 2147483647);
+          const campaignHistory = await createMailboxCampaignHistory({
+            audienceTab,
+            fileName,
+            recipientIds,
+            recipients,
+            scheduledAt,
+            scheduledDateValue,
+            scheduledTime,
+            selectionMode,
+            status: 'scheduled',
+            subject,
+          });
+
+          setTimeout(() => {
+            sendMailboxCampaign({ html, recipients, subject })
+              .then(() =>
+                strapi.db.query('api::mailbox-campaign.mailbox-campaign').update({
+                  where: { id: campaignHistory.id },
+                  data: {
+                    status: 'sent',
+                    sentAt: new Date(),
+                  },
+                })
+              )
+              .catch((error) => {
+                strapi.log.error('No se pudo enviar campana programada desde buzon.', error);
+                return strapi.db.query('api::mailbox-campaign.mailbox-campaign').update({
+                  where: { id: campaignHistory.id },
+                  data: {
+                    status: 'failed',
+                    errorMessage: error instanceof Error ? error.message : String(error),
+                  },
+                });
+              });
+          }, delay);
+
+          ctx.body = {
+            data: {
+              id: campaignHistory.id,
+              documentId: campaignHistory.documentId,
+              scheduled: true,
+              scheduledAt: scheduledAt.toISOString(),
+              total: recipients.length,
+            },
+          };
+          return;
+        }
+
+        await sendMailboxCampaign({ html, recipients, subject });
+        const campaignHistory = await createMailboxCampaignHistory({
+          audienceTab,
+          fileName,
+          recipientIds,
+          recipients,
+          scheduledAt,
+          scheduledDateValue,
+          scheduledTime,
+          selectionMode,
+          status: 'sent',
+          subject,
+        });
+
+        ctx.body = {
+          data: {
+            id: campaignHistory.id,
+            documentId: campaignHistory.documentId,
+            scheduled: false,
+            total: recipients.length,
+          },
         };
       },
     },
@@ -691,6 +895,22 @@ module.exports = () => ({
           method: 'POST',
           path: '/warehouse/:variantDocumentId',
           handler: 'warehouse.saveInventoryRow',
+          config: {
+            policies: ['admin::isAuthenticatedAdmin'],
+          },
+        },
+        {
+          method: 'GET',
+          path: '/mailbox/recipients',
+          handler: 'mailbox.findRecipients',
+          config: {
+            policies: ['admin::isAuthenticatedAdmin'],
+          },
+        },
+        {
+          method: 'POST',
+          path: '/mailbox/send',
+          handler: 'mailbox.sendCampaign',
           config: {
             policies: ['admin::isAuthenticatedAdmin'],
           },

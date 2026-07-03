@@ -22,7 +22,7 @@ export const metricsStyles = {
     gridTemplateColumns: '540px minmax(360px, 1fr) minmax(360px, 1fr)',
     gridTemplateRows: '220px 220px minmax(360px, 1fr)',
     gap: '16px',
-    maxWidth: '1500px',
+    maxWidth: '1800px',
     margin: '0 auto',
   } satisfies CSSProperties,
 
